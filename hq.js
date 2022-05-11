@@ -1,3 +1,5 @@
+if (typeof log === 'undefined')
+  var log = (...args) => console.log(...args);
 
 const vtmCONSTANTS = {
   VTMCOMMAND: "!vtm",
@@ -48,30 +50,26 @@ const vtmGlobal = {
 // roll20 api handler
 function roll20ApiHandler(msg) {
   // returns the chat window command entered, all in lowercase.
-  if (msg.type != 'api') return;
+  if (msg.type !== 'api') return;
 
-  log("New roll");
+  log("New roll:", msg);
 
   if (_.has(msg, 'inlinerolls'))
     msg = performInlineRolls(msg);
 
-  log(msg);
-
-  var chatCommand = msg.content;
+  let chatCommand = msg.content;
   vtmGlobal.reroll = chatCommand.replace(/\"/g, '&quot;').replace(/\~/g, '&#126;');
 
-  var argv = [].concat.apply([], chatCommand.split('~').map(function (v, i) {
+  let argv = [].concat.apply([], chatCommand.split('~').map(function (v, i) {
     return i % 2 ? v : v.split(' ')
   })).filter(Boolean);
   log(argv);
 
   try {
     if (vtmCONSTANTS.ROLLS.includes(argv[1])) {
-      let input = calculateVariables(argv, msg.who);
-      let run = calculateRunScript(input);
-      return processScriptTabs(run, msg.who);
+      return processVampireDiceScript(argv, msg.who)
     } else if (vtmCONSTANTS.DEBUG.includes(argv[1])) {
-      return processScriptTabs(argv, msg.who);
+      return processDebugScript(argv)
     }
   } catch (err) {
     sendChat("Error", "Invalid input " + err);
@@ -246,32 +244,26 @@ function baseDc() {
   return dc;
 }
 
-var processScriptTabs = function (argv, who) {
+function processDebugScript(argv) {
   // this will run the various other scripts depending upon the chat
   // window command.  Just add another Case statement to add a new command.
-  var tmpLogChat = false;
-  var tmpGraphicsChat = false;
-  var script = argv.shift();
-  switch (script) {
-    case vtmCONSTANTS.VTMCOMMAND:
-      switch (argv[0]) {
-        case "log":
-          setLogging(argv[1])
-          break;
-        case "graphics":
-          setGraphics(argv[1]);
-          break;
-        case "test":
-          runOldTests()
-          break;
-        default:
-          processVampireDiceScript(argv[0]);
-      }
+  switch (argv[1]) {
+    case "log":
+      setLogging(argv[1])
+      break;
+    case "graphics":
+      setGraphics(argv[1]);
+      break;
+    case "test":
+      runOldTests()
       break;
   }
 };
 
-function processVampireDiceScript(run) {
+function processVampireDiceScript(argv, who) {
+  let input = calculateVariables(argv, who);
+  let run = calculateRunScript(input);
+
   var attackDiceResults = {
     nilScore: 0,
     successScore: 0,
@@ -518,17 +510,17 @@ function handleSkillRoll(input) {
     vtmGlobal.luckydice = true;
     if (hunger > 0) {
       run.redDice = 1;
-      return ["!vtm", run];
+      return run;
     } else {
       run.blackDice = 1;
-      return ["!vtm", run];
+      return run;
     }
   }
 
   run.blackDice = dicepool - hunger;
   run.redDice = ((dicepool + hunger) - Math.abs(dicepool - hunger)) / 2;
 
-  return ["!vtm", run];
+  return run;
 }
 
 function handleWillpowerRoll(input) {
@@ -548,7 +540,7 @@ function handleWillpowerRoll(input) {
 
   run.blackDice = dicepool;
 
-  return ["!vtm", run];
+  return run;
 }
 
 function handleRouseRoll(input) {
@@ -562,7 +554,7 @@ function handleRouseRoll(input) {
     rouseStatRoll: true
   };
 
-  return ["!vtm", run];
+  return run;
 }
 
 function handleFrenzyRoll(input) {
@@ -582,13 +574,13 @@ function handleFrenzyRoll(input) {
   if (dicepool <= 0) {
     vtmGlobal.luckydice = true;
     run.redDice = 1;
-    return ["!vtm", run];
+    return run;
   }
 
   run.blackDice = 0;
   run.redDice = dicepool;
 
-  return ["!vtm", run];
+  return run;
 }
 
 function handleSimpleRoll(input) {
@@ -601,7 +593,7 @@ function handleSimpleRoll(input) {
     rollname: input.rollname
   };
 
-  return ["!vtm", run];
+  return run;
 }
 
 function handleRemorseRoll(input) {
@@ -621,7 +613,7 @@ function handleRemorseRoll(input) {
     remorseRoll: true
   };
 
-  return ["!vtm", run];
+  return run;
 }
 
 function handleHumanityRoll(input) {
@@ -640,7 +632,7 @@ function handleHumanityRoll(input) {
     rollname: input.rollname
   };
 
-  return ["!vtm", run];
+  return run;
 }
 
 // Used for multistate checkboxes
@@ -664,7 +656,7 @@ function scaleMultiboxValue(value, scaleNumber) {
   return value;
 }
 
-// Sets the logging verbosity
+// Sets the logging status
 function setLogging(value) {
   switch (value) {
     case "on":
@@ -709,7 +701,7 @@ function setGraphics(value) {
   }
 }
 
-// I don't presently know what this actually does.
+// I don't presently know what this is supposed to do.
 function runOldTests() {
   vtmGlobal.diceTestEnabled = true;
   tmpLogChat = vtmGlobal.diceLogChat;
@@ -728,7 +720,8 @@ function runOldTests() {
   vtmGlobal.diceGraphicsChat = tmpGraphicsChat;
 }
 
-// Performs basic tests
+// Performs basic happy-path testing.
+// Test cases are non-exhaustive as of current.
 function runTestSuite() {
   log('Running tests...');
   const prepVars = (msg) => {
@@ -745,32 +738,32 @@ function runTestSuite() {
   const testResults = {};
 
   let simpleVars = prepVars('!vtm roll w2 r2');
-  let simpleDicePool = handleSimpleRoll(simpleVars)[1];
+  let simpleDicePool = handleSimpleRoll(simpleVars);
   let simpleExpected = { blackDice: 2, redDice: 2 };
   testResults['Simple'] = compare(simpleDicePool, simpleExpected);
 
   let atrVars = prepVars('!vtm atr a3 r2 m2');
-  let atrDicePool = handleSkillRoll(atrVars)[1];
+  let atrDicePool = handleSkillRoll(atrVars);
   let atrExpected = { blackDice: 3, redDice: 2 };
   testResults['Attribute'] = compare(atrDicePool, atrExpected);
 
   let skillVars = prepVars('!vtm skill a3 r2 m2');
-  let skillDicePool = handleSkillRoll(skillVars)[1];
+  let skillDicePool = handleSkillRoll(skillVars);
   let skillExpected = { blackDice: 3, redDice: 2 };
   testResults['Skill'] = compare(skillDicePool, skillExpected);
 
   let willpowerVars = prepVars('!vtm will w3 a2 m1');
-  let willpowerDicePool = handleWillpowerRoll(willpowerVars)[1];
+  let willpowerDicePool = handleWillpowerRoll(willpowerVars);
   let willpowerExpected = { blackDice: 6, redDice: 0 };
   testResults['Willpower'] = compare(willpowerDicePool, willpowerExpected);
 
   let rouseVars = prepVars('!vtm rouse');
-  let rouseDicePool = handleRouseRoll(rouseVars)[1];
+  let rouseDicePool = handleRouseRoll(rouseVars);
   let rouseExpected = { blackDice: 0, redDice: 0, rouseStatRoll: true };
   testResults['Rouse'] = compare(rouseDicePool, rouseExpected);
 
   let rerollVars = prepVars('!vtm reroll w3');
-  let rerollDicePool = handleSimpleRoll(rerollVars)[1];
+  let rerollDicePool = handleSimpleRoll(rerollVars);
   let rerollExpected = { blackDice: 3, redDice: 0 };
   testResults['Reroll'] = compare(rerollDicePool, rerollExpected);
 
@@ -789,6 +782,5 @@ function runTestSuite() {
 if (typeof on !== 'undefined') {
   on("chat:message", roll20ApiHandler);
 } else {
-  var log = (...args) => console.log(...args);
   runTestSuite();
 }
