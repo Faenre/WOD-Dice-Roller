@@ -40,67 +40,60 @@ var vtmGlobal = {
   reroll: ""
 };
 
-function rollVTMDice(diceQty, type, dc) {
-  var roll = 0;
-  var diceResult = {
-    nilScore: 0,
-    successScore: 0,
-    critScore: 0,
-    muddyCritScore: 0,
-    failScore: 0,
-    diceGraphicsLog: "",
-    diceTextLog: ""
-  };
-
-  // Used to build images
-  function imgUrlBuilder(image, roll) {
-    return `<img src="${image}" title="${roll}" height="${vtmGlobal.diceGraphicsChatSize}" width="${vtmGlobal.diceGraphicsChatSize}" />`
+// roll20 api handler
+function roll20ApiHandler(msg) {
+  // returns the chat window command entered, all in lowercase.
+  if (msg.type != 'api') {
+    return;
   }
 
-  if (vtmGlobal.diceTestEnabled === true) {
-    diceQty = 10;
+  log("New roll");
+  log(msg);
+
+  if (_.has(msg, 'inlinerolls')) {
+    msg = performInlineRolls(msg);
   }
 
-  for (var i = 1; i <= diceQty; i++) {
+  log(msg);
 
-    if (vtmGlobal.diceTestEnabled === true) {
-      roll = roll + 1;
-    } else {
-      roll = randomInteger(10);
+  var chatCommand = msg.content;
+  vtmGlobal.reroll = chatCommand.replace(/\"/g, '&quot;').replace(/\~/g, '&#126;');
+
+  var argv = [].concat.apply([], chatCommand.split('~').map(function (v, i) {
+    return i % 2 ? v : v.split(' ')
+  })).filter(Boolean);
+  log("Post Splitting");
+  log(argv);
+
+  try {
+    if (argv[1] === "skill" || argv[1] === "atr" || argv[1] === "will" || argv[1] === "roll" || argv[1] === "rouse" || argv[1] === "frenzy" || argv[1] === "reroll" || argv[1] === "remorse" || argv[1] === "humanity") {
+      let input = calculateVariables(argv, msg.who);
+      let run = calculateRunScript(input);
+      let dc = calculateDc(run);
+      return processScriptTabs(run, msg.who, dc);
+    } else if (argv[1] === "log" || argv[1] === "graphics" || argv[1] === "test" || argv[1] === "hero" || argv[1] === "lupine") {
+      return processScriptTabs(argv, msg.who, baseDc());
     }
-
-    let image = getDiceImage(type, roll);
-    diceResult.diceTextLog += `(${roll})`;
-    diceResult.diceGraphicsLog += imgUrlBuilder(image, roll);
-
-    // TODO: break this away from nested IFs
-    if (type === "v") {
-      if (roll >= dc.critSuccess) {
-        diceResult.successScore += 1;
-        diceResult.critScore += 1;
-      } else if (roll >= dc.success) {
-        diceResult.successScore += 1;
-      } else if (roll >= dc.nil) {
-        diceResult.nilScore += 1;
-      } else if (roll >= dc.critFail) {
-        diceResult.nilScore += 1;
-      }
-    } else if (type === "h") {
-      if (roll >= dc.critSuccess) {
-        diceResult.successScore += 1;
-        diceResult.muddyCritScore += 1;
-      } else if (roll >= dc.success) {
-        diceResult.successScore += 1;
-      } else if (roll >= dc.nil) {
-        diceResult.nilScore += 1;
-      } else if (roll >= dc.critFail) {
-        diceResult.failScore += 1;
-      }
-    }
+  } catch (err) {
+    sendChat("Error", "Invalid input" + err);
+    return;
   }
-
-  return diceResult;
 }
+
+function performInlineRolls(msg) {
+  log("Inline Roll");
+  msg.content = _.chain(msg.inlinerolls)
+    .reduce(function (m, v, k) {
+      m['$[[' + k + ']]'] = v.results.total || 0;
+      return m;
+    }, {})
+    .reduce(function (m, v, k) {
+      return m.replace(k, v);
+    }, msg.content)
+    .value();
+
+  return msg;
+};
 
 /**
  * Get the image associated with the roll.
@@ -128,6 +121,224 @@ function getDiceImage(type, roll) {
       return imgPool.BOTCH;
   }
 }
+
+function calculateVariables(argv, who) {
+  var input = {
+    type: argv[1],
+    attribute: 0,
+    skill: 0,
+    hunger: 0,
+    modifier: 0,
+    willpower: 0,
+    user: who,
+    rollname: null,
+    successDc: 6,
+    difficulty: 1
+  };
+
+  for (i = 2; i < argv.length; i++) {
+    let entry = argv[i];
+    let identifier = entry.substring(0, 1);
+
+    if (identifier === "a") {
+      // Assign an int directly to an attribute
+      let value = parseInt(entry.substring(1), 10);
+      input.attribute = value;
+    } else if (identifier === "s") {
+      // Assign an int directly to a skill
+      let value = parseInt(entry.substring(1), 10);
+      input.skill = value;
+    } else if (identifier === "o") {
+      // Used to assign a trait much like "p", this is used in Willpower rolls to assign humanity
+      let value = parseInt(entry.substring(1), 10);
+      value = updateMultiboxValue(value);
+      input.skill = value;
+    } else if (identifier === "r") {
+      // Red die. Used for assigning a value directly to hunger die.
+      let value = parseInt(entry.substring(1), 10);
+      input.hunger = value;
+    } else if (identifier === "m") {
+      // Adds a modifier value straight
+      let value = parseInt(entry.substring(1), 10);
+      input.modifier += value;
+    } else if (identifier === "b") {
+      // Adds half of value to modifier. Example Discipline
+      let value = parseInt(entry.substring(1), 10);
+      value = Math.floor(value / 2.0);
+      input.modifier += value;
+    } else if (identifier === "w") {
+      // Used for willpower if you want to give it a value directly
+      let value = parseInt(entry.substring(1), 10);
+      input.willpower = value;
+    } else if (identifier === "p") {
+      // Used for traits which have 4 states such willpower and health
+      let value = parseInt(entry.substring(1), 10);
+      value = updateMultiboxValue(value);
+      input.willpower = value;
+    } else if (identifier === "d") {
+      // Used for varying a difficulty
+      let value = parseInt(entry.substring(1), 10);
+      if (value < 1) {
+        value = 1;
+      } else if (value > 10) {
+        value = 10;
+      }
+      input.successDc = value;
+    } else if (identifier === "c") {
+      // Used for assigning a character name
+      i++;
+      let value = argv[i];
+      if (value != undefined && value.trim().length != 0) {
+        input.user = value.trim();
+      }
+    } else if (identifier === "t") {
+      // Used for assigning a rollname
+      i++;
+      let value = argv[i];
+      if (value != undefined && value.trim().length != 0) {
+        input.rollname = value.trim();
+      }
+    } else if (identifier === "q") {
+      // The number of successes required (used for only certain rolls)
+      let value = parseInt(entry.substring(1), 10);
+      input.difficulty = value;
+    } else if (input.type === "remorse") {
+      log("remorse variable")
+      // Used for remorse rolls
+      let totalValue = parseInt(entry.substring(1), 10);
+      let totalRemorse = updateMultiboxValue(totalValue);
+      let missingRemorse = totalValue - totalRemorse;
+      missingRemorse = updateMultiboxValue1(missingRemorse);
+      input.willpower = missingRemorse / 16.0;
+    }
+  }
+
+  return input;
+}
+
+// Decides how to distribute dice based on the type of roll
+function calculateRunScript(input) {
+  if (input.type === "atr" || input.type === "skill") {
+    return handleSkillRoll(input);
+  } else if (input.type === "will") {
+    return handleWillpowerRoll(input);
+  } else if (input.type === "rouse") {
+    return handleRouseRoll(input);
+  } else if (input.type === "frenzy") {
+    return handleFrenzyRoll(input);
+  } else if (input.type === "remorse") {
+    return handleRemorseRoll(input);
+  } else if (input.type === "humanity") {
+    return handleHumanityRoll(input);
+  } else {
+    return handleSimpleRoll(input);
+  }
+}
+
+// Calculates DC
+function calculateDc(run) {
+  let dc;
+  if (run[1].rouseStatRoll === true) {
+    dc = {
+      // These DCs are set to be equal to or greater than their listed value
+      critFail: 1,
+      nil: 2,
+      success: 6,
+      // All DCs must be set, setting to a number >10 will mean it is effectively ignored
+      critSuccess: 10
+    }
+  } else {
+    dc = baseDc();
+  }
+  return dc;
+}
+
+// Get the standard DC
+function baseDc() {
+  var dc = {
+    // These DCs are set to be equal to or greater than their listed value
+    critFail: 1,
+    nil: 2,
+    success: 6,
+    critSuccess: 10
+  }
+  return dc;
+}
+
+var processScriptTabs = function (argv, who, dc) {
+  // this will run the various other scripts depending upon the chat
+  // window command.  Just add another Case statement to add a new command.
+  var tmpLogChat = false;
+  var tmpGraphicsChat = false;
+  var script = argv.shift();
+  switch (script) {
+    case vtmCONSTANTS.VTMCOMMAND:
+      switch (argv[0]) {
+        case "log":
+          switch (argv[1]) {
+            case "on":
+              vtmGlobal.diceLogChat = true;
+              break;
+            case "off":
+              vtmGlobal.diceLogChat = false;
+              break;
+            case "multi":
+              vtmGlobal.diceLogRolledOnOneLine = false;
+              break;
+            case "single":
+              vtmGlobal.diceLogRolledOnOneLine = true;
+              break;
+
+          }
+          break;
+        case "graphics":
+          switch (argv[1]) {
+            case "on":
+              vtmGlobal.diceGraphicsChat = true;
+              break;
+            case "off":
+              vtmGlobal.diceGraphicsChat = false;
+              break;
+            case "s":
+              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.SMALL;
+              break;
+            case "m":
+              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.MEDIUM;
+              break;
+            case "l":
+              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.LARGE;
+              break;
+            case "x":
+              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.XLARGE;
+              break;
+            case "xx":
+              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.XXLARGE;
+              break;
+          }
+          break;
+        case "test":
+          vtmGlobal.diceTestEnabled = true;
+          tmpLogChat = vtmGlobal.diceLogChat;
+          tmpGraphicsChat = vtmGlobal.diceGraphicsChat;
+          vtmGlobal.diceLogChat = true;
+          vtmGlobal.diceGraphicsChat = true;
+          var run = {
+            blackDice: 1,
+            redDice: 1,
+            user: who,
+            roll: null
+          };
+          processVampireDiceScript(run, dc);
+          vtmGlobal.diceTestEnabled = false;
+          vtmGlobal.diceLogChat = tmpLogChat;
+          vtmGlobal.diceGraphicsChat = tmpGraphicsChat;
+          break;
+        default:
+          processVampireDiceScript(argv[0], dc);
+      }
+      break;
+  }
+};
 
 function processVampireDiceScript(run, dc) {
   var attackDiceResults = {
@@ -249,6 +460,68 @@ function processVampireDiceScript(run, dc) {
   }
 }
 
+function rollVTMDice(diceQty, type, dc) {
+  var roll = 0;
+  var diceResult = {
+    nilScore: 0,
+    successScore: 0,
+    critScore: 0,
+    muddyCritScore: 0,
+    failScore: 0,
+    diceGraphicsLog: "",
+    diceTextLog: ""
+  };
+
+  // Used to build images
+  function imgUrlBuilder(image, roll) {
+    return `<img src="${image}" title="${roll}" height="${vtmGlobal.diceGraphicsChatSize}" width="${vtmGlobal.diceGraphicsChatSize}" />`
+  }
+
+  if (vtmGlobal.diceTestEnabled === true) {
+    diceQty = 10;
+  }
+
+  for (var i = 1; i <= diceQty; i++) {
+
+    if (vtmGlobal.diceTestEnabled === true) {
+      roll = roll + 1;
+    } else {
+      roll = randomInteger(10);
+    }
+
+    let image = getDiceImage(type, roll);
+    diceResult.diceTextLog += `(${roll})`;
+    diceResult.diceGraphicsLog += imgUrlBuilder(image, roll);
+
+    // TODO: break this away from nested IFs
+    if (type === "v") {
+      if (roll >= dc.critSuccess) {
+        diceResult.successScore += 1;
+        diceResult.critScore += 1;
+      } else if (roll >= dc.success) {
+        diceResult.successScore += 1;
+      } else if (roll >= dc.nil) {
+        diceResult.nilScore += 1;
+      } else if (roll >= dc.critFail) {
+        diceResult.nilScore += 1;
+      }
+    } else if (type === "h") {
+      if (roll >= dc.critSuccess) {
+        diceResult.successScore += 1;
+        diceResult.muddyCritScore += 1;
+      } else if (roll >= dc.success) {
+        diceResult.successScore += 1;
+      } else if (roll >= dc.nil) {
+        diceResult.nilScore += 1;
+      } else if (roll >= dc.critFail) {
+        diceResult.failScore += 1;
+      }
+    }
+  }
+
+  return diceResult;
+}
+
 function addRollDeclarations(diceTotals, outputMessage, endTemplateSection, thebeast) {
   // Crit bonus is + 2 successes for each PAIR of crits. Thus 2 crits is + 2 successs, 3 crits is + 2 successes.
   let critBonus = Math.floor((diceTotals.critScore + diceTotals.muddyCritScore) / 2.0) * 2.0;
@@ -293,96 +566,6 @@ function addRollDeclarations(diceTotals, outputMessage, endTemplateSection, theb
 
   return outputMessage;
 }
-
-var processScriptTabs = function (argv, who, dc) {
-  // this will run the various other scripts depending upon the chat
-  // window command.  Just add another Case statement to add a new command.
-  var tmpLogChat = false;
-  var tmpGraphicsChat = false;
-  var script = argv.shift();
-  switch (script) {
-    case vtmCONSTANTS.VTMCOMMAND:
-      switch (argv[0]) {
-        case "log":
-          switch (argv[1]) {
-            case "on":
-              vtmGlobal.diceLogChat = true;
-              break;
-            case "off":
-              vtmGlobal.diceLogChat = false;
-              break;
-            case "multi":
-              vtmGlobal.diceLogRolledOnOneLine = false;
-              break;
-            case "single":
-              vtmGlobal.diceLogRolledOnOneLine = true;
-              break;
-
-          }
-          break;
-        case "graphics":
-          switch (argv[1]) {
-            case "on":
-              vtmGlobal.diceGraphicsChat = true;
-              break;
-            case "off":
-              vtmGlobal.diceGraphicsChat = false;
-              break;
-            case "s":
-              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.SMALL;
-              break;
-            case "m":
-              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.MEDIUM;
-              break;
-            case "l":
-              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.LARGE;
-              break;
-            case "x":
-              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.XLARGE;
-              break;
-            case "xx":
-              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.XXLARGE;
-              break;
-          }
-          break;
-        case "test":
-          vtmGlobal.diceTestEnabled = true;
-          tmpLogChat = vtmGlobal.diceLogChat;
-          tmpGraphicsChat = vtmGlobal.diceGraphicsChat;
-          vtmGlobal.diceLogChat = true;
-          vtmGlobal.diceGraphicsChat = true;
-          var run = {
-            blackDice: 1,
-            redDice: 1,
-            user: who,
-            roll: null
-          };
-          processVampireDiceScript(run, dc);
-          vtmGlobal.diceTestEnabled = false;
-          vtmGlobal.diceLogChat = tmpLogChat;
-          vtmGlobal.diceGraphicsChat = tmpGraphicsChat;
-          break;
-        default:
-          processVampireDiceScript(argv[0], dc);
-      }
-      break;
-  }
-};
-
-function performInlineRolls(msg) {
-  log("Inline Roll");
-  msg.content = _.chain(msg.inlinerolls)
-    .reduce(function (m, v, k) {
-      m['$[[' + k + ']]'] = v.results.total || 0;
-      return m;
-    }, {})
-    .reduce(function (m, v, k) {
-      return m.replace(k, v);
-    }, msg.content)
-    .value();
-
-  return msg;
-};
 
 function handleSkillRoll(input) {
   log("Atr/Skill Roll");
@@ -525,100 +708,6 @@ function handleHumanityRoll(input) {
   return ["!vtm", run];
 }
 
-function calculateVariables(argv, who) {
-  var input = {
-    type: argv[1],
-    attribute: 0,
-    skill: 0,
-    hunger: 0,
-    modifier: 0,
-    willpower: 0,
-    user: who,
-    rollname: null,
-    successDc: 6,
-    difficulty: 1
-  };
-
-  for (i = 2; i < argv.length; i++) {
-    let entry = argv[i];
-    let identifier = entry.substring(0, 1);
-
-    if (identifier === "a") {
-      // Assign an int directly to an attribute
-      let value = parseInt(entry.substring(1), 10);
-      input.attribute = value;
-    } else if (identifier === "s") {
-      // Assign an int directly to a skill
-      let value = parseInt(entry.substring(1), 10);
-      input.skill = value;
-    } else if (identifier === "o") {
-      // Used to assign a trait much like "p", this is used in Willpower rolls to assign humanity
-      let value = parseInt(entry.substring(1), 10);
-      value = updateMultiboxValue(value);
-      input.skill = value;
-    } else if (identifier === "r") {
-      // Red die. Used for assigning a value directly to hunger die.
-      let value = parseInt(entry.substring(1), 10);
-      input.hunger = value;
-    } else if (identifier === "m") {
-      // Adds a modifier value straight
-      let value = parseInt(entry.substring(1), 10);
-      input.modifier += value;
-    } else if (identifier === "b") {
-      // Adds half of value to modifier. Example Discipline
-      let value = parseInt(entry.substring(1), 10);
-      value = Math.floor(value / 2.0);
-      input.modifier += value;
-    } else if (identifier === "w") {
-      // Used for willpower if you want to give it a value directly
-      let value = parseInt(entry.substring(1), 10);
-      input.willpower = value;
-    } else if (identifier === "p") {
-      // Used for traits which have 4 states such willpower and health
-      let value = parseInt(entry.substring(1), 10);
-      value = updateMultiboxValue(value);
-      input.willpower = value;
-    } else if (identifier === "d") {
-      // Used for varying a difficulty
-      let value = parseInt(entry.substring(1), 10);
-      if (value < 1) {
-        value = 1;
-      } else if (value > 10) {
-        value = 10;
-      }
-      input.successDc = value;
-    } else if (identifier === "c") {
-      // Used for assigning a character name
-      i++;
-      let value = argv[i];
-      if (value != undefined && value.trim().length != 0) {
-        input.user = value.trim();
-      }
-    } else if (identifier === "t") {
-      // Used for assigning a rollname
-      i++;
-      let value = argv[i];
-      if (value != undefined && value.trim().length != 0) {
-        input.rollname = value.trim();
-      }
-    } else if (identifier === "q") {
-      // The number of successes required (used for only certain rolls)
-      let value = parseInt(entry.substring(1), 10);
-      input.difficulty = value;
-    } else if (input.type === "remorse") {
-      log("remorse variable")
-      // Used for remorse rolls
-      let totalValue = parseInt(entry.substring(1), 10);
-      let totalRemorse = updateMultiboxValue(totalValue);
-      let missingRemorse = totalValue - totalRemorse;
-      missingRemorse = updateMultiboxValue1(missingRemorse);
-      input.willpower = missingRemorse / 16.0;
-    }
-  }
-
-  return input;
-}
-
 // Used for multistate checkboxes
 function updateMultiboxValue(totalValue) {
   let value = totalValue;
@@ -646,95 +735,6 @@ function scaleMultiboxValue(value, scaleNumber) {
   }
 
   return value;
-}
-
-// Decides how to distribute dice based on the type of roll
-function calculateRunScript(input) {
-  if (input.type === "atr" || input.type === "skill") {
-    return handleSkillRoll(input);
-  } else if (input.type === "will") {
-    return handleWillpowerRoll(input);
-  } else if (input.type === "rouse") {
-    return handleRouseRoll(input);
-  } else if (input.type === "frenzy") {
-    return handleFrenzyRoll(input);
-  } else if (input.type === "remorse") {
-    return handleRemorseRoll(input);
-  } else if (input.type === "humanity") {
-    return handleHumanityRoll(input);
-  } else {
-    return handleSimpleRoll(input);
-  }
-}
-
-// Get the standard DC
-function baseDc() {
-  var dc = {
-    // These DCs are set to be equal to or greater than their listed value
-    critFail: 1,
-    nil: 2,
-    success: 6,
-    critSuccess: 10
-  }
-  return dc;
-}
-
-// Calculates DC
-function calculateDc(run) {
-  let dc;
-  if (run[1].rouseStatRoll === true) {
-    dc = {
-      // These DCs are set to be equal to or greater than their listed value
-      critFail: 1,
-      nil: 2,
-      success: 6,
-      // All DCs must be set, setting to a number >10 will mean it is effectively ignored
-      critSuccess: 10
-    }
-  } else {
-    dc = baseDc();
-  }
-  return dc;
-}
-
-// roll20 api handler
-function roll20ApiHandler(msg) {
-  // returns the chat window command entered, all in lowercase.
-  if (msg.type != 'api') {
-    return;
-  }
-
-  log("New roll");
-  log(msg);
-
-  if (_.has(msg, 'inlinerolls')) {
-    msg = performInlineRolls(msg);
-  }
-
-  log(msg);
-
-  var chatCommand = msg.content;
-  vtmGlobal.reroll = chatCommand.replace(/\"/g, '&quot;').replace(/\~/g, '&#126;');
-
-  var argv = [].concat.apply([], chatCommand.split('~').map(function (v, i) {
-    return i % 2 ? v : v.split(' ')
-  })).filter(Boolean);
-  log("Post Splitting");
-  log(argv);
-
-  try {
-    if (argv[1] === "skill" || argv[1] === "atr" || argv[1] === "will" || argv[1] === "roll" || argv[1] === "rouse" || argv[1] === "frenzy" || argv[1] === "reroll" || argv[1] === "remorse" || argv[1] === "humanity") {
-      let input = calculateVariables(argv, msg.who);
-      let run = calculateRunScript(input);
-      let dc = calculateDc(run);
-      return processScriptTabs(run, msg.who, dc);
-    } else if (argv[1] === "log" || argv[1] === "graphics" || argv[1] === "test" || argv[1] === "hero" || argv[1] === "lupine") {
-      return processScriptTabs(argv, msg.who, baseDc());
-    }
-  } catch (err) {
-    sendChat("Error", "Invalid input" + err);
-    return;
-  }
 }
 
 // Performs basic tests
