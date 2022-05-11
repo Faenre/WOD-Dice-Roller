@@ -68,7 +68,7 @@ In these rolls the first two arguments must be `!vtm [type]`. All other numbers 
 ```js
 // shows dice rolled as graphic: 
 // small, medium, or large if "on", or as text if "off" 
-!vtm graphics on|off|s|m|l  // default:on and m
+!vtm graphics on|off|s|m|l|x|xx  // default:on and x
 ```
 
 ```js

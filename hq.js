@@ -1,6 +1,11 @@
 
 const vtmCONSTANTS = {
   VTMCOMMAND: "!vtm",
+  ROLLS: [
+    'skill', 'atr', 'will', 'roll', 'rouse', 'reroll',
+    'frenzy', 'remorse', 'humanity'
+  ],
+  DEBUG: ['log', 'graphics', 'test'],
   GRAPHICSIZE: {
     SMALL: 20,
     MEDIUM: 30,
@@ -43,16 +48,12 @@ const vtmGlobal = {
 // roll20 api handler
 function roll20ApiHandler(msg) {
   // returns the chat window command entered, all in lowercase.
-  if (msg.type != 'api') {
-    return;
-  }
+  if (msg.type != 'api') return;
 
   log("New roll");
-  log(msg);
 
-  if (_.has(msg, 'inlinerolls')) {
+  if (_.has(msg, 'inlinerolls'))
     msg = performInlineRolls(msg);
-  }
 
   log(msg);
 
@@ -62,19 +63,18 @@ function roll20ApiHandler(msg) {
   var argv = [].concat.apply([], chatCommand.split('~').map(function (v, i) {
     return i % 2 ? v : v.split(' ')
   })).filter(Boolean);
-  log("Post Splitting");
   log(argv);
 
   try {
-    if (argv[1] === "skill" || argv[1] === "atr" || argv[1] === "will" || argv[1] === "roll" || argv[1] === "rouse" || argv[1] === "frenzy" || argv[1] === "reroll" || argv[1] === "remorse" || argv[1] === "humanity") {
+    if (vtmCONSTANTS.ROLLS.includes(argv[1])) {
       let input = calculateVariables(argv, msg.who);
       let run = calculateRunScript(input);
       return processScriptTabs(run, msg.who);
-    } else if (argv[1] === "log" || argv[1] === "graphics" || argv[1] === "test" || argv[1] === "hero" || argv[1] === "lupine") {
+    } else if (vtmCONSTANTS.DEBUG.includes(argv[1])) {
       return processScriptTabs(argv, msg.who);
     }
   } catch (err) {
-    sendChat("Error", "Invalid input" + err);
+    sendChat("Error", "Invalid input " + err);
     return;
   }
 }
@@ -249,7 +249,6 @@ function baseDc() {
 var processScriptTabs = function (argv, who) {
   // this will run the various other scripts depending upon the chat
   // window command.  Just add another Case statement to add a new command.
-  let dc = baseDc();
   var tmpLogChat = false;
   var tmpGraphicsChat = false;
   var script = argv.shift();
@@ -257,72 +256,22 @@ var processScriptTabs = function (argv, who) {
     case vtmCONSTANTS.VTMCOMMAND:
       switch (argv[0]) {
         case "log":
-          switch (argv[1]) {
-            case "on":
-              vtmGlobal.diceLogChat = true;
-              break;
-            case "off":
-              vtmGlobal.diceLogChat = false;
-              break;
-            case "multi":
-              vtmGlobal.diceLogRolledOnOneLine = false;
-              break;
-            case "single":
-              vtmGlobal.diceLogRolledOnOneLine = true;
-              break;
-
-          }
+          setLogging(argv[1])
           break;
         case "graphics":
-          switch (argv[1]) {
-            case "on":
-              vtmGlobal.diceGraphicsChat = true;
-              break;
-            case "off":
-              vtmGlobal.diceGraphicsChat = false;
-              break;
-            case "s":
-              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.SMALL;
-              break;
-            case "m":
-              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.MEDIUM;
-              break;
-            case "l":
-              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.LARGE;
-              break;
-            case "x":
-              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.XLARGE;
-              break;
-            case "xx":
-              vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.XXLARGE;
-              break;
-          }
+          setGraphics(argv[1]);
           break;
         case "test":
-          vtmGlobal.diceTestEnabled = true;
-          tmpLogChat = vtmGlobal.diceLogChat;
-          tmpGraphicsChat = vtmGlobal.diceGraphicsChat;
-          vtmGlobal.diceLogChat = true;
-          vtmGlobal.diceGraphicsChat = true;
-          var run = {
-            blackDice: 1,
-            redDice: 1,
-            user: who,
-            roll: null
-          };
-          processVampireDiceScript(run, dc);
-          vtmGlobal.diceTestEnabled = false;
-          vtmGlobal.diceLogChat = tmpLogChat;
-          vtmGlobal.diceGraphicsChat = tmpGraphicsChat;
+          runOldTests()
           break;
         default:
-          processVampireDiceScript(argv[0], dc);
+          processVampireDiceScript(argv[0]);
       }
       break;
   }
 };
 
-function processVampireDiceScript(run, dc) {
+function processVampireDiceScript(run) {
   var attackDiceResults = {
     nilScore: 0,
     successScore: 0,
@@ -350,8 +299,8 @@ function processVampireDiceScript(run, dc) {
   log(run);
   let user = run.user;
 
-  attackDiceResults = rollVTMDice(run.blackDice, "v", dc);
-  defendDiceResults = rollVTMDice(run.redDice, "h", dc);
+  attackDiceResults = rollVTMDice(run.blackDice, "v");
+  defendDiceResults = rollVTMDice(run.redDice, "h");
 
   log(attackDiceResults);
   log(defendDiceResults);
@@ -442,7 +391,7 @@ function processVampireDiceScript(run, dc) {
   }
 }
 
-function rollVTMDice(diceQty, type, dc) {
+function rollVTMDice(diceQty, type) {
   var roll = 0;
   var diceResult = {
     nilScore: 0,
@@ -453,6 +402,7 @@ function rollVTMDice(diceQty, type, dc) {
     diceGraphicsLog: "",
     diceTextLog: ""
   };
+  let dc = baseDc()
 
   // Used to build images
   function imgUrlBuilder(image, roll) {
@@ -712,6 +662,70 @@ function scaleMultiboxValue(value, scaleNumber) {
   while (value > scaleNumber) value -= scaleNumber;
 
   return value;
+}
+
+// Sets the logging verbosity
+function setLogging(value) {
+  switch (value) {
+    case "on":
+      vtmGlobal.diceLogChat = true;
+      break;
+    case "off":
+      vtmGlobal.diceLogChat = false;
+      break;
+    case "multi":
+      vtmGlobal.diceLogRolledOnOneLine = false;
+      break;
+    case "single":
+      vtmGlobal.diceLogRolledOnOneLine = true;
+      break;
+  }
+}
+
+// Configures the graphics options (text vs image, and image sizes)
+function setGraphics(value) {
+  switch (value) {
+    case "on":
+      vtmGlobal.diceGraphicsChat = true;
+      break;
+    case "off":
+      vtmGlobal.diceGraphicsChat = false;
+      break;
+    case "s":
+      vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.SMALL;
+      break;
+    case "m":
+      vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.MEDIUM;
+      break;
+    case "l":
+      vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.LARGE;
+      break;
+    case "x":
+      vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.XLARGE;
+      break;
+    case "xx":
+      vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.XXLARGE;
+      break;
+  }
+}
+
+// I don't presently know what this actually does.
+function runOldTests() {
+  vtmGlobal.diceTestEnabled = true;
+  tmpLogChat = vtmGlobal.diceLogChat;
+  tmpGraphicsChat = vtmGlobal.diceGraphicsChat;
+  vtmGlobal.diceLogChat = true;
+  vtmGlobal.diceGraphicsChat = true;
+  var run = {
+    blackDice: 1,
+    redDice: 1,
+    user: who,
+    roll: null
+  };
+  processVampireDiceScript(run, dc);
+  vtmGlobal.diceTestEnabled = false;
+  vtmGlobal.diceLogChat = tmpLogChat;
+  vtmGlobal.diceGraphicsChat = tmpGraphicsChat;
 }
 
 // Performs basic tests
