@@ -92,35 +92,8 @@ function performInlineRolls(msg) {
   return msg;
 };
 
-/**
- * Get the image associated with the roll.
- * @param {*} type The type (V) Vampire or (H) Hunger.
- * @param {*} roll The roll value. Returns null if not 1 - 10
- */
-function getDiceImage(type, roll) {
-  if (roll < 1 || roll > 10) { return null; }
-
-  imgPool = vtmCONSTANTS.IMG.DICE[(type === 'v') ? 'NORMAL' : 'MESSY']
-  switch(roll) {
-    case 1:
-      return imgPool.BOTCH;
-    case 2:
-    case 3:
-    case 4:
-    case 5:
-      return imgPool.MISS;
-    case 6:
-    case 7:
-    case 8:
-    case 9:
-      return imgPool.PASS;
-    case 10:
-      return imgPool.BOTCH;
-  }
-}
-
-function calculateVariables(argv, who) {
-  var input = {
+function parseCommandLineVariables(argv, who) {
+  const args = {
     type: argv[1],
     attribute: 0,
     skill: 0,
@@ -140,38 +113,38 @@ function calculateVariables(argv, who) {
     if (identifier === "a") {
       // Assign an int directly to an attribute
       let value = parseInt(entry.substring(1), 10);
-      input.attribute = value;
+      args.attribute = value;
     } else if (identifier === "s") {
       // Assign an int directly to a skill
       let value = parseInt(entry.substring(1), 10);
-      input.skill = value;
+      args.skill = value;
     } else if (identifier === "o") {
       // Used to assign a trait much like "p", this is used in Willpower rolls to assign humanity
       let value = parseInt(entry.substring(1), 10);
       value = updateMultiboxValue(value);
-      input.skill = value;
+      args.skill = value;
     } else if (identifier === "r") {
       // Red die. Used for assigning a value directly to hunger die.
       let value = parseInt(entry.substring(1), 10);
-      input.hunger = value;
+      args.hunger = value;
     } else if (identifier === "m") {
       // Adds a modifier value straight
       let value = parseInt(entry.substring(1), 10);
-      input.modifier += value;
+      args.modifier += value;
     } else if (identifier === "b") {
       // Adds half of value to modifier. Example Discipline
       let value = parseInt(entry.substring(1), 10);
       value = Math.floor(value / 2.0);
-      input.modifier += value;
+      args.modifier += value;
     } else if (identifier === "w") {
       // Used for willpower if you want to give it a value directly
       let value = parseInt(entry.substring(1), 10);
-      input.willpower = value;
+      args.willpower = value;
     } else if (identifier === "p") {
       // Used for traits which have 4 states such willpower and health
       let value = parseInt(entry.substring(1), 10);
       value = updateMultiboxValue(value);
-      input.willpower = value;
+      args.willpower = value;
     } else if (identifier === "d") {
       // Used for varying a difficulty
       let value = parseInt(entry.substring(1), 10);
@@ -180,55 +153,50 @@ function calculateVariables(argv, who) {
       } else if (value > 10) {
         value = 10;
       }
-      input.successDc = value;
+      args.successDc = value;
     } else if (identifier === "c") {
       // Used for assigning a character name
       i++;
       let value = argv[i];
       if (value != undefined && value.trim().length != 0) {
-        input.user = value.trim();
+        args.user = value.trim();
       }
     } else if (identifier === "t") {
       // Used for assigning a rollname
       i++;
       let value = argv[i];
       if (value != undefined && value.trim().length != 0) {
-        input.rollname = value.trim();
+        args.rollname = value.trim();
       }
     } else if (identifier === "q") {
       // The number of successes required (used for only certain rolls)
       let value = parseInt(entry.substring(1), 10);
-      input.difficulty = value;
-    } else if (input.type === "remorse") {
+      args.difficulty = value;
+    } else if (args.type === "remorse") {
       log("remorse variable")
       // Used for remorse rolls
       let totalValue = parseInt(entry.substring(1), 10);
       let totalRemorse = updateMultiboxValue(totalValue);
       let missingRemorse = totalValue - totalRemorse;
       missingRemorse = updateMultiboxValue1(missingRemorse);
-      input.willpower = missingRemorse / 16.0;
+      args.willpower = missingRemorse / 16.0;
     }
   }
 
-  return input;
+  return args;
 }
 
 // Decides how to distribute dice based on the type of roll
 function calculateRunScript(input) {
-  if (input.type === "atr" || input.type === "skill") {
-    return handleSkillRoll(input);
-  } else if (input.type === "will") {
-    return handleWillpowerRoll(input);
-  } else if (input.type === "rouse") {
-    return handleRouseRoll(input);
-  } else if (input.type === "frenzy") {
-    return handleFrenzyRoll(input);
-  } else if (input.type === "remorse") {
-    return handleRemorseRoll(input);
-  } else if (input.type === "humanity") {
-    return handleHumanityRoll(input);
-  } else {
-    return handleSimpleRoll(input);
+  switch (input) {
+    case 'atr':
+    case 'skill':     return handleSkillRoll(input);
+    case 'will':      return handleWillpowerRoll(input);
+    case 'rouse':     return handleRouseRoll(input);
+    case 'frenzy':    return handleFrenzyRoll(input);
+    case 'remorse':   return handleRemorseRoll(input);
+    case 'humanity':  return handleHumanityRoll(input);
+    default:          return handleSimpleRoll(input);
   }
 }
 
@@ -261,7 +229,7 @@ function processDebugScript(argv) {
 };
 
 function processVampireDiceScript(argv, who) {
-  let input = calculateVariables(argv, who);
+  let input = parseCommandLineVariables(argv, who);
   let run = calculateRunScript(input);
 
   var attackDiceResults = {
@@ -443,6 +411,29 @@ function rollVTMDice(diceQty, type) {
   }
 
   return diceResult;
+}
+
+/**
+ * Get the image associated with the roll.
+ * @param {*} type The type (V) Vampire or (H) Hunger.
+ * @param {*} roll The roll value. Returns null if not 1 - 10
+ */
+function getDiceImage(type, roll) {
+  if (roll < 1 || roll > 10) { return null; }
+
+  imgPool = vtmCONSTANTS.IMG.DICE[(type === 'v') ? 'NORMAL' : 'MESSY']
+  switch (roll) {
+    case 1:   return imgPool.BOTCH;
+    case 2:
+    case 3:
+    case 4:
+    case 5:   return imgPool.MISS;
+    case 6:
+    case 7:
+    case 8:
+    case 9:   return imgPool.PASS;
+    case 10:  return imgPool.BOTCH;
+  }
 }
 
 function addRollDeclarations(diceTotals, outputMessage, endTemplateSection, thebeast) {
@@ -696,7 +687,7 @@ function setGraphics(value) {
 function runTestSuite() {
   log('Running tests...');
   const prepVars = (msg) => {
-    return calculateVariables(msg.split(' '), 'Sample User');
+    return parseCommandLineVariables(msg.split(' '), 'Sample User');
   };
   const compare = (given, expected) => {
     for (const [key, expectation] of Object.entries(expected)) {
