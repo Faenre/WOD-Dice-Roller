@@ -30,6 +30,13 @@ const vtmCONSTANTS = {
         CRIT: "https://i.imgur.com/xUhtSHU.png"
       }
     }
+  },
+  BASEDC:{
+    // These DCs are set to be equal to or greater than their listed value
+    critFail: 1,
+    nil: 2,
+    success: 6,
+    critSuccess: 10
   }
 };
 
@@ -96,7 +103,7 @@ function formatCommandLineArguments(chatCommand) {
 }
 
 function parseCommandLineVariables(argv, who) {
-  const args = {
+  let args = {
     type: argv[1],
     attribute: 0,
     skill: 0,
@@ -190,7 +197,7 @@ function parseCommandLineVariables(argv, who) {
 
 // Decides how to distribute dice based on the type of roll
 function calculateRunScript(input) {
-  switch (input) {
+  switch (input.type) {
     case 'atr':
     case 'skill':     return handleSkillRoll(input);
     case 'will':      return handleWillpowerRoll(input);
@@ -200,18 +207,6 @@ function calculateRunScript(input) {
     case 'humanity':  return handleHumanityRoll(input);
     default:          return handleSimpleRoll(input);
   }
-}
-
-// Get the standard DC
-function baseDc() {
-  var dc = {
-    // These DCs are set to be equal to or greater than their listed value
-    critFail: 1,
-    nil: 2,
-    success: 6,
-    critSuccess: 10
-  };
-  return dc;
 }
 
 function processDebugScript(argv) {
@@ -352,7 +347,7 @@ function processVampireDiceScript(argv, who) {
 }
 
 function rollVTMDice(diceQty, type) {
-  const dc = baseDc();
+  const dc = vtmCONSTANTS.BASEDC;
   const diceResult = {
     nilScore: 0,
     successScore: 0,
