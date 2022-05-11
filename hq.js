@@ -1,5 +1,5 @@
 
-var vtmCONSTANTS = {
+const vtmCONSTANTS = {
   VTMCOMMAND: "!vtm",
   GRAPHICSIZE: {
     SMALL: 20,
@@ -26,7 +26,7 @@ var vtmCONSTANTS = {
   }
 };
 
-var vtmGlobal = {
+const vtmGlobal = {
   diceLogChat: true,
   diceGraphicsChat: true,
   diceGraphicsChatSize: vtmCONSTANTS.GRAPHICSIZE.XLARGE,
@@ -69,10 +69,9 @@ function roll20ApiHandler(msg) {
     if (argv[1] === "skill" || argv[1] === "atr" || argv[1] === "will" || argv[1] === "roll" || argv[1] === "rouse" || argv[1] === "frenzy" || argv[1] === "reroll" || argv[1] === "remorse" || argv[1] === "humanity") {
       let input = calculateVariables(argv, msg.who);
       let run = calculateRunScript(input);
-      let dc = calculateDc(run);
-      return processScriptTabs(run, msg.who, dc);
+      return processScriptTabs(run, msg.who);
     } else if (argv[1] === "log" || argv[1] === "graphics" || argv[1] === "test" || argv[1] === "hero" || argv[1] === "lupine") {
-      return processScriptTabs(argv, msg.who, baseDc());
+      return processScriptTabs(argv, msg.who);
     }
   } catch (err) {
     sendChat("Error", "Invalid input" + err);
@@ -235,24 +234,6 @@ function calculateRunScript(input) {
   }
 }
 
-// Calculates DC
-function calculateDc(run) {
-  let dc;
-  if (run[1].rouseStatRoll === true) {
-    dc = {
-      // These DCs are set to be equal to or greater than their listed value
-      critFail: 1,
-      nil: 2,
-      success: 6,
-      // All DCs must be set, setting to a number >10 will mean it is effectively ignored
-      critSuccess: 10
-    }
-  } else {
-    dc = baseDc();
-  }
-  return dc;
-}
-
 // Get the standard DC
 function baseDc() {
   var dc = {
@@ -261,13 +242,14 @@ function baseDc() {
     nil: 2,
     success: 6,
     critSuccess: 10
-  }
+  };
   return dc;
 }
 
-var processScriptTabs = function (argv, who, dc) {
+var processScriptTabs = function (argv, who) {
   // this will run the various other scripts depending upon the chat
   // window command.  Just add another Case statement to add a new command.
+  let dc = baseDc();
   var tmpLogChat = false;
   var tmpGraphicsChat = false;
   var script = argv.shift();
@@ -474,7 +456,7 @@ function rollVTMDice(diceQty, type, dc) {
 
   // Used to build images
   function imgUrlBuilder(image, roll) {
-    return `<img src="${image}" title="${roll}" height="${vtmGlobal.diceGraphicsChatSize}" width="${vtmGlobal.diceGraphicsChatSize}" />`
+    return `<img src="${image}" title="${roll}" height="${vtmGlobal.diceGraphicsChatSize}" width="${vtmGlobal.diceGraphicsChatSize}" />`;
   }
 
   if (vtmGlobal.diceTestEnabled === true) {
@@ -482,7 +464,6 @@ function rollVTMDice(diceQty, type, dc) {
   }
 
   for (var i = 1; i <= diceQty; i++) {
-
     if (vtmGlobal.diceTestEnabled === true) {
       roll = roll + 1;
     } else {
@@ -621,6 +602,8 @@ function handleWillpowerRoll(input) {
 }
 
 function handleRouseRoll(input) {
+  log("Rouse Roll");
+  log(input);
   var run = {
     blackDice: 0,
     redDice: input.modifier,
@@ -633,6 +616,8 @@ function handleRouseRoll(input) {
 }
 
 function handleFrenzyRoll(input) {
+  log("Frenzy Roll");
+  log(input);
   let dicepool = input.willpower + input.modifier + Math.floor(input.skill / 3.0);
 
   var run = {
@@ -690,8 +675,8 @@ function handleRemorseRoll(input) {
 }
 
 function handleHumanityRoll(input) {
-  log("Humanity Roll")
-  log(run);
+  log("Humanity Roll");
+  log(input);
   let dice = input.skill + input.modifier;
   if (dice <= 0) {
     vtmGlobal.luckydice = true;
@@ -709,8 +694,7 @@ function handleHumanityRoll(input) {
 }
 
 // Used for multistate checkboxes
-function updateMultiboxValue(totalValue) {
-  let value = totalValue;
+function updateMultiboxValue(value) {
   value = scaleMultiboxValue(value, 3616);
   value = scaleMultiboxValue(value, 241);
   value = scaleMultiboxValue(value, 16);
@@ -718,21 +702,14 @@ function updateMultiboxValue(totalValue) {
 }
 
 // Used for multistate checkboxes
-function updateMultiboxValue1(totalValue) {
-  let value = totalValue;
+function updateMultiboxValue1(value) {
   value = scaleMultiboxValue(value, 3616);
   value = scaleMultiboxValue(value, 241);
   return value;
 }
 
 function scaleMultiboxValue(value, scaleNumber) {
-  while (value > 0) {
-    value -= scaleNumber;
-  }
-
-  if (value < 0) {
-    value += scaleNumber
-  }
+  while (value > scaleNumber) value -= scaleNumber;
 
   return value;
 }
@@ -790,14 +767,14 @@ function runTestSuite() {
   // * humanity
 
   Object.entries(testResults).forEach(([test, result]) => {
-    log(`${result ? 'Pass' : 'Fail'} for test '${test}'`)
-  })
+    log(`${result ? 'Pass' : 'Fail'} for test '${test}'`);
+  });
 }
 
 // Allows this script to run in local node instances
-if (typeof(on) !== 'undefined') {
+if (typeof on !== 'undefined') {
   on("chat:message", roll20ApiHandler);
 } else {
-  var log = (...args) => { console.log(...args) };
-  runTestSuite()
+  var log = (...args) => console.log(...args);
+  runTestSuite();
 }
