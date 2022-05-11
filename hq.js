@@ -1,5 +1,5 @@
-if (typeof log === 'undefined')
-  var log = (...args) => console.log(...args);
+if (typeof log === 'undefined') var log = (...args) => console.log(...args);
+if (typeof sendChat === 'undefined') var sendChat = log;
 
 const vtmCONSTANTS = {
   VTMCOMMAND: "!vtm",
@@ -54,26 +54,19 @@ function roll20ApiHandler(msg) {
 
   log("New roll:", msg);
 
-  if (_.has(msg, 'inlinerolls'))
-    msg = performInlineRolls(msg);
+  if (_.has(msg, 'inlinerolls')) msg = performInlineRolls(msg);
 
-  let chatCommand = msg.content;
-  vtmGlobal.reroll = chatCommand.replace(/\"/g, '&quot;').replace(/\~/g, '&#126;');
-
-  let argv = [].concat.apply([], chatCommand.split('~').map(function (v, i) {
-    return i % 2 ? v : v.split(' ')
-  })).filter(Boolean);
+  let argv = formatCommandLineArguments(msg.content);
   log(argv);
 
   try {
     if (vtmCONSTANTS.ROLLS.has(argv[1])) {
-      return processVampireDiceScript(argv, msg.who)
+      processVampireDiceScript(argv, msg.who);
     } else if (vtmCONSTANTS.DEBUG.has(argv[1])) {
-      return processDebugScript(argv)
+      processDebugScript(argv);
     }
   } catch (err) {
     sendChat("Error", "Invalid input " + err);
-    return;
   }
 }
 
@@ -90,7 +83,17 @@ function performInlineRolls(msg) {
     .value();
 
   return msg;
-};
+}
+
+function formatCommandLineArguments(chatCommand) {
+  vtmGlobal.reroll = chatCommand.replace(/"/g, '&quot;').replace(/~/g, '&#126;');
+
+  let argv = [].concat.apply([], chatCommand.split('~').map(function (v, i) {
+    return i % 2 ? v : v.split(' ');
+  })).filter(Boolean);
+
+  return argv;
+}
 
 function parseCommandLineVariables(argv, who) {
   const args = {
@@ -106,7 +109,7 @@ function parseCommandLineVariables(argv, who) {
     difficulty: 1
   };
 
-  for (i = 2; i < argv.length; i++) {
+  for (let i = 2; i < argv.length; i++) {
     let entry = argv[i];
     let identifier = entry.substring(0, 1);
 
@@ -158,14 +161,14 @@ function parseCommandLineVariables(argv, who) {
       // Used for assigning a character name
       i++;
       let value = argv[i];
-      if (value != undefined && value.trim().length != 0) {
+      if (value && value.trim().length) {
         args.user = value.trim();
       }
     } else if (identifier === "t") {
       // Used for assigning a rollname
       i++;
       let value = argv[i];
-      if (value != undefined && value.trim().length != 0) {
+      if (value && value.trim().length) {
         args.rollname = value.trim();
       }
     } else if (identifier === "q") {
@@ -173,7 +176,6 @@ function parseCommandLineVariables(argv, who) {
       let value = parseInt(entry.substring(1), 10);
       args.difficulty = value;
     } else if (args.type === "remorse") {
-      log("remorse variable")
       // Used for remorse rolls
       let totalValue = parseInt(entry.substring(1), 10);
       let totalRemorse = updateMultiboxValue(totalValue);
@@ -217,16 +219,16 @@ function processDebugScript(argv) {
   // window command.  Just add another Case statement to add a new command.
   switch (argv[1]) {
     case "log":
-      setLogging(argv[1])
+      setLogging(argv[1]);
       break;
     case "graphics":
       setGraphics(argv[1]);
       break;
     case "test":
-      runTestSuite()
+      runTestSuite();
       break;
   }
-};
+}
 
 function processVampireDiceScript(argv, who) {
   let input = parseCommandLineVariables(argv, who);
@@ -265,7 +267,7 @@ function processVampireDiceScript(argv, who) {
   log(attackDiceResults);
   log(defendDiceResults);
 
-  var diceTotals = {
+  let diceTotals = {
     nilScore: attackDiceResults.nilScore + defendDiceResults.nilScore,
     successScore: attackDiceResults.successScore + defendDiceResults.successScore,
     critScore: attackDiceResults.critScore + defendDiceResults.critScore,
@@ -295,22 +297,20 @@ function processVampireDiceScript(argv, who) {
       } else {
         outputMessage += "{{Roll=" + diceTextRolled + endTemplateSection;
       }
+    } else if (vtmGlobal.diceGraphicsChat === true) {
+      outputMessage += "{{Normal=" + attackDiceResults.diceGraphicsLog + endTemplateSection;
+      outputMessage += "{{Hunger=" + defendDiceResults.diceGraphicsLog + endTemplateSection;
     } else {
-      if (vtmGlobal.diceGraphicsChat === true) {
-        outputMessage += "{{Normal=" + attackDiceResults.diceGraphicsLog + endTemplateSection;
-        outputMessage += "{{Hunger=" + defendDiceResults.diceGraphicsLog + endTemplateSection;
-      } else {
-        outputMessage += "{{Normal=" + attackDiceResults.diceTextLog + endTemplateSection;
-        outputMessage += "{{Hunger=" + defendDiceResults.diceTextLog + endTemplateSection;
-      }
+      outputMessage += "{{Normal=" + attackDiceResults.diceTextLog + endTemplateSection;
+      outputMessage += "{{Hunger=" + defendDiceResults.diceTextLog + endTemplateSection;
     }
   }
 
   let thebeast = '<img src="https://i.imgur.com/6N0Ld40.png" title="The Beast" height="20" width="228"/>';
 
   if (run.rouseStatRoll) {
-      let critBonus = Math.floor((diceTotals.critScore + diceTotals.muddyCritScore) / 2.0) * 2.0;
-      outputMessage += "{{Successes=" + (diceTotals.successScore + critBonus) + endTemplateSection;
+    let critBonus = Math.floor((diceTotals.critScore + diceTotals.muddyCritScore) / 2.0) * 2.0;
+    outputMessage += "{{Successes=" + (diceTotals.successScore + critBonus) + endTemplateSection;
     if (diceTotals.successScore > 0) {
       outputMessage += "{{Beast=" + '<img src="https://i.imgur.com/UV57YLP.png" title="Hunger Gain" height="20" width="228"/>' + endTemplateSection;
     } else {
@@ -346,14 +346,14 @@ function processVampireDiceScript(argv, who) {
 
   log("Output");
   log(outputMessage);
-  if (vtmGlobal.diceTestEnabled != true) {
+  if (!vtmGlobal.diceTestEnabled) {
     sendChat(user, outputMessage);
   }
 }
 
 function rollVTMDice(diceQty, type) {
-  var roll = 0;
-  var diceResult = {
+  const dc = baseDc();
+  const diceResult = {
     nilScore: 0,
     successScore: 0,
     critScore: 0,
@@ -362,7 +362,6 @@ function rollVTMDice(diceQty, type) {
     diceGraphicsLog: "",
     diceTextLog: ""
   };
-  let dc = baseDc()
 
   // Used to build images
   function imgUrlBuilder(image, roll) {
@@ -373,12 +372,8 @@ function rollVTMDice(diceQty, type) {
     diceQty = 10;
   }
 
-  for (var i = 1; i <= diceQty; i++) {
-    if (vtmGlobal.diceTestEnabled === true) {
-      roll = roll + 1;
-    } else {
-      roll = randomInteger(10);
-    }
+  for (let i = 1; i <= diceQty; i++) {
+    let  roll = Math.floor(Math.random() * 10) + 1;
 
     let image = getDiceImage(type, roll);
     diceResult.diceTextLog += `(${roll})`;
@@ -419,9 +414,7 @@ function rollVTMDice(diceQty, type) {
  * @param {*} roll The roll value. Returns null if not 1 - 10
  */
 function getDiceImage(type, roll) {
-  if (roll < 1 || roll > 10) { return null; }
-
-  imgPool = vtmCONSTANTS.IMG.DICE[(type === 'v') ? 'NORMAL' : 'MESSY']
+  let imgPool = vtmCONSTANTS.IMG.DICE[(type === 'v') ? 'NORMAL' : 'MESSY'];
   switch (roll) {
     case 1:   return imgPool.BOTCH;
     case 2:
@@ -432,7 +425,8 @@ function getDiceImage(type, roll) {
     case 7:
     case 8:
     case 9:   return imgPool.PASS;
-    case 10:  return imgPool.BOTCH;
+    case 10:  return imgPool.CRIT;
+    default:  return null;
   }
 }
 
@@ -442,12 +436,12 @@ function addRollDeclarations(diceTotals, outputMessage, endTemplateSection, theb
   outputMessage += "{{Successes=" + (diceTotals.successScore + critBonus) + endTemplateSection;
 
 
-  if (diceTotals.successScore == 0 && vtmGlobal.luckydice) {
+  if (diceTotals.successScore === 0 && vtmGlobal.luckydice) {
     let lastResort = '<img src="https://i.imgur.com/4XbkQua.png" title="Miss" height="20" width="228"/>';
     outputMessage += "{{Fate=" + lastResort + endTemplateSection;
     let miss = '<img src="https://raw.githubusercontent.com/Roll20/roll20-character-sheets/master/vampire-v5/Banners/MissFail.png" title="Miss" height="20" width="228"/>';
     outputMessage += "{{Miss=" + miss + endTemplateSection;
-  } else if (diceTotals.successScore == 0) {
+  } else if (diceTotals.successScore === 0) {
     //outputMessage += "{{Fate=" + "Total failure" + endTemplateSection;
     let miss = '<img src="https://raw.githubusercontent.com/Roll20/roll20-character-sheets/master/vampire-v5/Banners/MissFail.png" title="Miss" height="20" width="228"/>';
     outputMessage += "{{Miss=" + miss + endTemplateSection;
@@ -490,7 +484,7 @@ function handleSkillRoll(input) {
     dicepool += input.skill;
   }
 
-  var run = {
+  let run = {
     blackDice: 0,
     redDice: 0,
     user: input.user,
@@ -517,7 +511,7 @@ function handleSkillRoll(input) {
 function handleWillpowerRoll(input) {
   let dicepool = input.willpower + input.attribute + input.modifier;
 
-  var run = {
+  let run = {
     blackDice: 0,
     redDice: 0,
     user: input.user,
@@ -537,7 +531,7 @@ function handleWillpowerRoll(input) {
 function handleRouseRoll(input) {
   log("Rouse Roll");
   log(input);
-  var run = {
+  let run = {
     blackDice: 0,
     redDice: input.modifier,
     user: input.user,
@@ -553,7 +547,7 @@ function handleFrenzyRoll(input) {
   log(input);
   let dicepool = input.willpower + input.modifier + Math.floor(input.skill / 3.0);
 
-  var run = {
+  let run = {
     blackDice: 0,
     redDice: 0,
     user: input.user,
@@ -577,7 +571,7 @@ function handleFrenzyRoll(input) {
 function handleSimpleRoll(input) {
   log("Simple Roll");
   log(input);
-  var run = {
+  let run = {
     blackDice: input.willpower,
     redDice: input.hunger,
     user: input.user,
@@ -596,7 +590,7 @@ function handleRemorseRoll(input) {
     dice = 1;
   }
 
-  var run = {
+  let run = {
     blackDice: dice,
     redDice: 0,
     user: input.user,
@@ -616,7 +610,7 @@ function handleHumanityRoll(input) {
     dice = 1;
   }
 
-  var run = {
+  let run = {
     blackDice: dice,
     redDice: 0,
     user: input.user,
@@ -673,12 +667,12 @@ function setGraphics(value) {
     vtmGlobal.diceGraphicsChat = false;
   } else {
     vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE[{
-      's':  'SMALL',
-      'm':  'MEDIUM',
-      'l':  'LARGE',
-      'x':  'XLARGE',
-      'xx': 'XXLARGE'
-    }[value]]
+      s:  'SMALL',
+      m:  'MEDIUM',
+      l:  'LARGE',
+      x:  'XLARGE',
+      xx: 'XXLARGE'
+    }[value]];
   }
 }
 
