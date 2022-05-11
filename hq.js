@@ -3,11 +3,11 @@ if (typeof log === 'undefined')
 
 const vtmCONSTANTS = {
   VTMCOMMAND: "!vtm",
-  ROLLS: [
+  ROLLS: new Set([
     'skill', 'atr', 'will', 'roll', 'rouse', 'reroll',
     'frenzy', 'remorse', 'humanity'
-  ],
-  DEBUG: ['log', 'graphics', 'test'],
+  ]),
+  DEBUG: new Set(['log', 'graphics', 'test']),
   GRAPHICSIZE: {
     SMALL: 20,
     MEDIUM: 30,
@@ -66,9 +66,9 @@ function roll20ApiHandler(msg) {
   log(argv);
 
   try {
-    if (vtmCONSTANTS.ROLLS.includes(argv[1])) {
+    if (vtmCONSTANTS.ROLLS.has(argv[1])) {
       return processVampireDiceScript(argv, msg.who)
-    } else if (vtmCONSTANTS.DEBUG.includes(argv[1])) {
+    } else if (vtmCONSTANTS.DEBUG.has(argv[1])) {
       return processDebugScript(argv)
     }
   } catch (err) {
@@ -255,7 +255,7 @@ function processDebugScript(argv) {
       setGraphics(argv[1]);
       break;
     case "test":
-      runOldTests()
+      runTestSuite()
       break;
   }
 };
@@ -676,48 +676,19 @@ function setLogging(value) {
 
 // Configures the graphics options (text vs image, and image sizes)
 function setGraphics(value) {
-  switch (value) {
-    case "on":
-      vtmGlobal.diceGraphicsChat = true;
-      break;
-    case "off":
-      vtmGlobal.diceGraphicsChat = false;
-      break;
-    case "s":
-      vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.SMALL;
-      break;
-    case "m":
-      vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.MEDIUM;
-      break;
-    case "l":
-      vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.LARGE;
-      break;
-    case "x":
-      vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.XLARGE;
-      break;
-    case "xx":
-      vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE.XXLARGE;
-      break;
+  if (value === 'on') {
+    vtmGlobal.diceGraphicsChat = true;
+  } else if (value === 'off') {
+    vtmGlobal.diceGraphicsChat = false;
+  } else {
+    vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE[{
+      's':  'SMALL',
+      'm':  'MEDIUM',
+      'l':  'LARGE',
+      'x':  'XLARGE',
+      'xx': 'XXLARGE'
+    }[value]]
   }
-}
-
-// I don't presently know what this is supposed to do.
-function runOldTests() {
-  vtmGlobal.diceTestEnabled = true;
-  tmpLogChat = vtmGlobal.diceLogChat;
-  tmpGraphicsChat = vtmGlobal.diceGraphicsChat;
-  vtmGlobal.diceLogChat = true;
-  vtmGlobal.diceGraphicsChat = true;
-  var run = {
-    blackDice: 1,
-    redDice: 1,
-    user: who,
-    roll: null
-  };
-  processVampireDiceScript(run, dc);
-  vtmGlobal.diceTestEnabled = false;
-  vtmGlobal.diceLogChat = tmpLogChat;
-  vtmGlobal.diceGraphicsChat = tmpGraphicsChat;
 }
 
 // Performs basic happy-path testing.
@@ -729,9 +700,8 @@ function runTestSuite() {
   };
   const compare = (given, expected) => {
     for (const [key, expectation] of Object.entries(expected)) {
-      if (given[key] !== expectation)
-        return false;
-    };
+      if (given[key] !== expectation) return false;
+    }
     return true;
   };
 
