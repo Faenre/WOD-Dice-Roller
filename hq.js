@@ -102,6 +102,31 @@ function formatCommandLineArguments(chatCommand) {
   return argv;
 }
 
+function processDebugScript(argv) {
+  // this will run the various other scripts depending upon the chat
+  // window command.  Just add another Case statement to add a new command.
+  switch (argv[1]) {
+    case "log":
+      setLogging(argv[1]);
+      break;
+    case "graphics":
+      setGraphics(argv[1]);
+      break;
+    case "test":
+      runTestSuite();
+      break;
+  }
+}
+
+function processVampireDiceScript(argv, who) {
+  let input = parseCommandLineVariables(argv, who);
+  let dicePool = calculateRunScript(input);
+  dicePool.user = input.user;
+  dicePool.rollname = input.rollname;
+
+  return vtmRollDiceSuperclass(dicePool);
+}
+
 function parseCommandLineVariables(argv, who) {
   let args = {
     type: argv[1],
@@ -209,26 +234,7 @@ function calculateRunScript(input) {
   }
 }
 
-function processDebugScript(argv) {
-  // this will run the various other scripts depending upon the chat
-  // window command.  Just add another Case statement to add a new command.
-  switch (argv[1]) {
-    case "log":
-      setLogging(argv[1]);
-      break;
-    case "graphics":
-      setGraphics(argv[1]);
-      break;
-    case "test":
-      runTestSuite();
-      break;
-  }
-}
-
-function processVampireDiceScript(argv, who) {
-  let input = parseCommandLineVariables(argv, who);
-  let dicePool = calculateRunScript(input);
-
+function vtmRollDiceSuperclass(dicePool) {
   var attackDiceResults = {
     nilScore: 0,
     successScore: 0,
@@ -477,7 +483,7 @@ function handleSkillRoll(input) {
   let dice = input.attribute + input.modifier;
   if (input.type === "skill") dice += input.skill;
 
-  let dicePool = new DicePool(0, 0, input.user, input.rollname);
+  let dicePool = new DicePool(0, 0);
 
   if (dice <= 0) {
     vtmGlobal.luckydice = true;
@@ -503,7 +509,7 @@ function handleWillpowerRoll(input) {
     dice = 1;
   }
 
-  let dicePool = new DicePool(dice, 0, input.user, input.rollname);
+  let dicePool = new DicePool(dice, 0);
 
   return dicePool;
 }
@@ -512,7 +518,7 @@ function handleRouseRoll(input) {
   log("Rouse Roll");
   log(input);
 
-  let dicePool = new DicePool(0, input.modifier, input.user, input.rollname);
+  let dicePool = new DicePool(0, input.modifier);
   dicePool.rouseStatRoll = true;
 
   return dicePool;
@@ -523,7 +529,7 @@ function handleFrenzyRoll(input) {
   log(input);
   let dice = input.willpower + input.modifier + Math.floor(input.skill / 3.0);
 
-  let dicePool = new DicePool(dice, 0, input.user, input.rollname);
+  let dicePool = new DicePool(dice, 0);
   dicePool.frenzyRoll = true;
   dicePool.difficulty = input.difficulty;
 
@@ -544,7 +550,7 @@ function handleSimpleRoll(input) {
   log(input);
 
   let dicePool = new DicePool(input.willpower, input.hunger,
-    input.user, input.rollname);
+  );
 
   return dicePool;
 }
@@ -558,7 +564,7 @@ function handleRemorseRoll(input) {
     dice = 1;
   }
 
-  let dicePool = new DicePool(dice, 0, input.user, input.rollname);
+  let dicePool = new DicePool(dice, 0);
   dicePool.remorseRoll = true;
 
   return dicePool;
@@ -573,7 +579,7 @@ function handleHumanityRoll(input) {
     dice = 1;
   }
 
-  let dicePool = new DicePool(dice, 0, input.user, input.rollname);
+  let dicePool = new DicePool(dice, 0);
 
   return dicePool;
 }
@@ -691,11 +697,9 @@ function runTestSuite() {
   });
 }
 
-function DicePool (black, red, user, rollname) {
+function DicePool (black, red) {
   this.blackDice = black;
   this.redDice = red;
-  this.user = user;
-  this.rollname = rollname;
 }
 
 // Allows this script to run in local node instances
