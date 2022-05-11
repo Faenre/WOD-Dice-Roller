@@ -526,7 +526,7 @@ function handleHumanityRoll(input) {
 }
 
 function calculateVariables(argv, who) {
-  let input = {
+  var input = {
     type: argv[1],
     attribute: 0,
     skill: 0,
@@ -541,9 +541,71 @@ function calculateVariables(argv, who) {
 
   for (i = 2; i < argv.length; i++) {
     let entry = argv[i];
+    let identifier = entry.substring(0, 1);
 
-    // TODO: refactor this?
-    if (input.type === 'remorse') {
+    if (identifier === "a") {
+      // Assign an int directly to an attribute
+      let value = parseInt(entry.substring(1), 10);
+      input.attribute = value;
+    } else if (identifier === "s") {
+      // Assign an int directly to a skill
+      let value = parseInt(entry.substring(1), 10);
+      input.skill = value;
+    } else if (identifier === "o") {
+      // Used to assign a trait much like "p", this is used in Willpower rolls to assign humanity
+      let value = parseInt(entry.substring(1), 10);
+      value = updateMultiboxValue(value);
+      input.skill = value;
+    } else if (identifier === "r") {
+      // Red die. Used for assigning a value directly to hunger die.
+      let value = parseInt(entry.substring(1), 10);
+      input.hunger = value;
+    } else if (identifier === "m") {
+      // Adds a modifier value straight
+      let value = parseInt(entry.substring(1), 10);
+      input.modifier += value;
+    } else if (identifier === "b") {
+      // Adds half of value to modifier. Example Discipline
+      let value = parseInt(entry.substring(1), 10);
+      value = Math.floor(value / 2.0);
+      input.modifier += value;
+    } else if (identifier === "w") {
+      // Used for willpower if you want to give it a value directly
+      let value = parseInt(entry.substring(1), 10);
+      input.willpower = value;
+    } else if (identifier === "p") {
+      // Used for traits which have 4 states such willpower and health
+      let value = parseInt(entry.substring(1), 10);
+      value = updateMultiboxValue(value);
+      input.willpower = value;
+    } else if (identifier === "d") {
+      // Used for varying a difficulty
+      let value = parseInt(entry.substring(1), 10);
+      if (value < 1) {
+        value = 1;
+      } else if (value > 10) {
+        value = 10;
+      }
+      input.successDc = value;
+    } else if (identifier === "c") {
+      // Used for assigning a character name
+      i++;
+      let value = argv[i];
+      if (value != undefined && value.trim().length != 0) {
+        input.user = value.trim();
+      }
+    } else if (identifier === "t") {
+      // Used for assigning a rollname
+      i++;
+      let value = argv[i];
+      if (value != undefined && value.trim().length != 0) {
+        input.rollname = value.trim();
+      }
+    } else if (identifier === "q") {
+      // The number of successes required (used for only certain rolls)
+      let value = parseInt(entry.substring(1), 10);
+      input.difficulty = value;
+    } else if (input.type === "remorse") {
       log("remorse variable")
       // Used for remorse rolls
       let totalValue = parseInt(entry.substring(1), 10);
@@ -551,60 +613,7 @@ function calculateVariables(argv, who) {
       let missingRemorse = totalValue - totalRemorse;
       missingRemorse = updateMultiboxValue1(missingRemorse);
       input.willpower = missingRemorse / 16.0;
-      continue
     }
-    let identifier = entry.substring(0, 1);
-
-    if (identifier === 'c' || identifier === 't') {
-      let value = argv[i];
-    } else {
-      let value = parseInt(entry.substring(1), 10);
-    }
-
-    switch (identifier) {
-      case 'a' : // Assign an int directly to an attribute
-        input.attribute = value;
-        break;
-      case 's' : // Assign an int directly to a skill
-        input.skill = value;
-        break;
-      case 'o' : // Used to assign a trait much like "p", this is used in Willpower rolls to assign humanity
-        input.skill = updateMultiboxValue(value);
-        break;
-      case 'r' : // Red die. Used for assigning a value directly to hunger die.
-        input.hunger = value;
-        break;
-      case 'm' : // Adds a modifier value straight
-        input.modifier += value;
-        break;
-      case 'b' : // Adds half of value to modifier. Example Discipline
-        input.modifier += Math.floor(value / 2.0);
-        break;
-      case 'w' : // Used for willpower if you want to give it a value directly
-        input.willpower = value;
-        break;
-      case 'p' : // Used for traits which have 4 states such willpower and health
-        input.willpower = updateMultiboxValue(value);
-        break;
-      case 'd' : // Used for varying a difficulty
-        input.successDc = min(10, max(1, value));
-        break;
-      case 'c' : // Used for assigning a character name
-        i++;
-        if (value != undefined && value.trim().length != 0) {
-          input.user = value.trim();
-        }
-        break;
-      case 't' : // Used for assigning a rollname
-        i++;
-        if (value != undefined && value.trim().length != 0) {
-          input.rollname = value.trim();
-        }
-        break;
-      case 'q' : // The number of successes required (used for only certain rolls)
-        input.difficulty = value;
-        break;
-      }
   }
 
   return input;
@@ -728,9 +737,22 @@ function roll20ApiHandler(msg) {
   }
 }
 
+// Performs basic tests
+function runTestSuite() {
+  const prepVars = (msg) => {
+    const who = { 'user': 'SampleUser' };
+    return calculateVariables(msg, who);
+  };
+
+  let simpleRoll = prepVars('!vtm roll w2 r2');
+  let simpleRollDicePool = handleSimpleRoll(simpleRoll);
+
+}
+
 // Allows this script to run in local node instances
 if (typeof(on) !== 'undefined') {
   on("chat:message", roll20ApiHandler);
 } else {
-  console.log('execution successful');
+  const log = (x) => { console.log(x) };
+  log('execution successful');
 }
