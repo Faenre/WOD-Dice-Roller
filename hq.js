@@ -739,20 +739,65 @@ function roll20ApiHandler(msg) {
 
 // Performs basic tests
 function runTestSuite() {
+  log('Running tests...');
   const prepVars = (msg) => {
-    const who = { 'user': 'SampleUser' };
-    return calculateVariables(msg, who);
+    return calculateVariables(msg.split(' '), 'Sample User');
+  };
+  const compare = (given, expected) => {
+    for (const [key, expectation] of Object.entries(expected)) {
+      if (given[key] !== expectation)
+        return false;
+    };
+    return true;
   };
 
-  let simpleRoll = prepVars('!vtm roll w2 r2');
-  let simpleRollDicePool = handleSimpleRoll(simpleRoll);
+  const testResults = {};
 
+  let simpleVars = prepVars('!vtm roll w2 r2');
+  let simpleDicePool = handleSimpleRoll(simpleVars)[1];
+  let simpleExpected = { blackDice: 2, redDice: 2 };
+  testResults['Simple'] = compare(simpleDicePool, simpleExpected);
+
+  let atrVars = prepVars('!vtm atr a3 r2 m2');
+  let atrDicePool = handleSkillRoll(atrVars)[1];
+  let atrExpected = { blackDice: 3, redDice: 2 };
+  testResults['Attribute'] = compare(atrDicePool, atrExpected);
+
+  let skillVars = prepVars('!vtm skill a3 r2 m2');
+  let skillDicePool = handleSkillRoll(skillVars)[1];
+  let skillExpected = { blackDice: 3, redDice: 2 };
+  testResults['Skill'] = compare(skillDicePool, skillExpected);
+
+  let willpowerVars = prepVars('!vtm will w3 a2 m1');
+  let willpowerDicePool = handleWillpowerRoll(willpowerVars)[1];
+  let willpowerExpected = { blackDice: 6, redDice: 0 };
+  testResults['Willpower'] = compare(willpowerDicePool, willpowerExpected);
+
+  let rouseVars = prepVars('!vtm rouse');
+  let rouseDicePool = handleRouseRoll(rouseVars)[1];
+  let rouseExpected = { blackDice: 0, redDice: 0, rouseStatRoll: true };
+  testResults['Rouse'] = compare(rouseDicePool, rouseExpected);
+
+  let rerollVars = prepVars('!vtm reroll w3');
+  let rerollDicePool = handleSimpleRoll(rerollVars)[1];
+  let rerollExpected = { blackDice: 3, redDice: 0 };
+  testResults['Reroll'] = compare(rerollDicePool, rerollExpected);
+
+  // TODO: either add tests for the following, or remove their implementation:
+  // * willpower (2nd version)
+  // * frenzy
+  // * remorse
+  // * humanity
+
+  Object.entries(testResults).forEach(([test, result]) => {
+    log(`${result ? 'Pass' : 'Fail'} for test '${test}'`)
+  })
 }
 
 // Allows this script to run in local node instances
 if (typeof(on) !== 'undefined') {
   on("chat:message", roll20ApiHandler);
 } else {
-  const log = (x) => { console.log(x) };
-  log('execution successful');
+  var log = (...args) => { console.log(...args) };
+  runTestSuite()
 }
