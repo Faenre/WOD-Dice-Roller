@@ -2,6 +2,8 @@
 
 This is a modified version of the dice mechanics originally created by Konrad J and ported to Vampire: the Masquerade 5e by Momtahan K.
 
+This app is currently under heavy revision and refactoring. See [the trello](https://trello.com/b/Qw6BLmaQ/wod-dice-mechanics) for current status.
+
 # Usage
 
 ```js
