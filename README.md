@@ -6,27 +6,6 @@ This app is currently under heavy revision and refactoring. See [the trello](htt
 
 # Usage
 
-```js
-!vtm log on|multi|single|off // default:on and multi
-```
-- outputs dice rolled to the chat window if "on", only the result if "off"
-- dice rolled will be on single line if "single" and on multiple lines if "multi"
-
-```js
-!vtm graphics on|off|s|m|l  // default:on and m
-```
-- shows dice rolled as graphic, small, medium, or large if "on" or as text if "off"
-
-```js
-!vtm test
-``` 
-- this will output every side of every die to the chat window (currently does not work)
-
-```js
-!vtm hero // Only for true heroes
-!vtm lupine // When people ask for too much
-```
-
 There are several different types of rolls.
 
 In these rolls the first two arguments must be `!vtm [type]`. All other numbers are optional and may be ignored depending on the type of roll
@@ -78,3 +57,21 @@ In these rolls the first two arguments must be `!vtm [type]`. All other numbers 
 
 - Adding `b#` to a skill roll will add the value/2.0 to the number of vampire dice. This is used for blood potency when handling disciplines
 
+## Extra
+
+```js
+// Outputs dice rolled to the chat window if 'on', or only the result if 'off'.
+// Set multi or single to determine whether dice go on single lines or multiple.
+!vtm log on|multi|single|off // default:on and multi
+```
+
+```js
+// shows dice rolled as graphic: 
+// small, medium, or large if "on", or as text if "off" 
+!vtm graphics on|off|s|m|l  // default:on and m
+```
+
+```js
+// this will output every side of every die to the chat window
+!vtm test
+``` 
