@@ -362,12 +362,6 @@ var processScriptTabs = function (argv, who, dc) {
           vtmGlobal.diceLogChat = tmpLogChat;
           vtmGlobal.diceGraphicsChat = tmpGraphicsChat;
           break;
-        case "hero":
-          sendChat("The best thing about Hero Quest!", "https://www.youtube.com/watch?v=Cx8sl2uC46A");
-          break;
-        case "lupine":
-          //sendChat("Some players (and character sheet designers)...", "");
-          break;
         default:
           processVampireDiceScript(argv[0], dc);
       }
@@ -532,7 +526,7 @@ function handleHumanityRoll(input) {
 }
 
 function calculateVariables(argv, who) {
-  var input = {
+  let input = {
     type: argv[1],
     attribute: 0,
     skill: 0,
@@ -549,7 +543,7 @@ function calculateVariables(argv, who) {
     let entry = argv[i];
 
     // TODO: refactor this?
-    if input.type === 'remorse' {
+    if (input.type === 'remorse') {
       log("remorse variable")
       // Used for remorse rolls
       let totalValue = parseInt(entry.substring(1), 10);
@@ -610,6 +604,7 @@ function calculateVariables(argv, who) {
       case 'q' : // The number of successes required (used for only certain rolls)
         input.difficulty = value;
         break;
+      }
   }
 
   return input;
@@ -693,7 +688,8 @@ function calculateDc(run) {
   return dc;
 }
 
-on("chat:message", function (msg) {
+// roll20 api handler
+function roll20ApiHandler(msg) {
   // returns the chat window command entered, all in lowercase.
   if (msg.type != 'api') {
     return;
@@ -702,11 +698,9 @@ on("chat:message", function (msg) {
   log("New roll");
   log(msg);
 
-
   if (_.has(msg, 'inlinerolls')) {
     msg = performInlineRolls(msg);
   }
-
 
   log(msg);
 
@@ -732,4 +726,11 @@ on("chat:message", function (msg) {
     sendChat("Error", "Invalid input" + err);
     return;
   }
-});
+}
+
+// Allows this script to run in local node instances
+if (typeof(on) !== 'undefined') {
+  on("chat:message", roll20ApiHandler);
+} else {
+  console.log('execution successful');
+}
