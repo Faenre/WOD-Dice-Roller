@@ -80,9 +80,9 @@ function roll20ApiHandler(msg) {
 function performInlineRolls(msg) {
   log("Inline Roll");
   msg.content = _.chain(msg.inlinerolls)
-    .reduce(function (m, v, k) {
-      m['$[[' + k + ']]'] = v.results.total || 0;
-      return m;
+    .reduce(function (accumulator, currentValue, index) {
+      accumulator['$[[' + index + ']]'] = currentValue.results.total || 0;
+      return accumulator;
     }, {})
     .reduce(function (m, v, k) {
       return m.replace(k, v);
@@ -124,7 +124,7 @@ function processVampireDiceScript(argv, who) {
   dicePool.user = input.user;
   dicePool.rollname = input.rollname;
 
-  return vtmRollDiceSuperclass(dicePool);
+  return vtmRollDiceSuperFunc(dicePool);
 }
 
 function parseCommandLineVariables(argv, who) {
@@ -234,7 +234,7 @@ function calculateRunScript(input) {
   }
 }
 
-function vtmRollDiceSuperclass(dicePool) {
+function vtmRollDiceSuperFunc(dicePool) {
   var attackDiceResults = {
     nilScore: 0,
     successScore: 0,
@@ -477,109 +477,49 @@ function addRollDeclarations(diceTotals, outputMessage, endTemplateSection, theb
 }
 
 function handleSkillRoll(input) {
-  log("Atr/Skill Roll");
-  log(input);
-  let hunger = input.hunger;
-  let dice = input.attribute + input.modifier;
-  if (input.type === "skill") dice += input.skill;
-
-  let dicePool = new DicePool(0, 0);
-
-  if (dice <= 0) {
-    vtmGlobal.luckydice = true;
-    if (hunger > 0) {
-      dicePool.redDice = 1;
-    } else {
-      dicePool.blackDice = 1;
-    }
-    return dicePool;
-  }
-
-  dicePool.blackDice = dice - hunger;
-  dicePool.redDice = ((dice + hunger) - Math.abs(dice - hunger)) / 2;
+  let dicePool = createDicePool(input, true);
 
   return dicePool;
 }
 
 function handleWillpowerRoll(input) {
-  let dice = input.willpower + input.attribute + input.modifier;
-
-  if (dice <= 0) {
-    vtmGlobal.luckydice = true;
-    dice = 1;
-  }
-
-  let dicePool = new DicePool(dice, 0);
+  let dicePool = createDicePool(input, true);
 
   return dicePool;
 }
 
 function handleRouseRoll(input) {
-  log("Rouse Roll");
-  log(input);
-
-  let dicePool = new DicePool(0, input.modifier);
+  let args = {hunger: Math.max(1, input.modifier)};
+  let dicePool = createDicePool(args);
   dicePool.rouseStatRoll = true;
 
   return dicePool;
 }
 
 function handleFrenzyRoll(input) {
-  log("Frenzy Roll");
-  log(input);
-  let dice = input.willpower + input.modifier + Math.floor(input.skill / 3.0);
-
-  let dicePool = new DicePool(dice, 0);
+  let dicePool = createDicePool(input, true);
   dicePool.frenzyRoll = true;
   dicePool.difficulty = input.difficulty;
-
-  if (dice <= 0) {
-    vtmGlobal.luckydice = true;
-    dicePool.redDice = 1;
-    return dicePool;
-  }
-
-  dicePool.blackDice = 0;
-  dicePool.redDice = dice;
 
   return dicePool;
 }
 
 function handleSimpleRoll(input) {
-  log("Simple Roll");
-  log(input);
-
-  let dicePool = new DicePool(input.willpower, input.hunger,
-  );
+  input.modifier = (input.modifier || 0) + input.hunger;
+  let dicePool = createDicePool(input, false);
 
   return dicePool;
 }
 
 function handleRemorseRoll(input) {
-  log("Remorse Roll");
-  log(input);
-  let dice = input.willpower + input.modifier;
-  if (dice <= 0) {
-    vtmGlobal.luckydice = true;
-    dice = 1;
-  }
-
-  let dicePool = new DicePool(dice, 0);
+  let dicePool = createDicePool(input, true);
   dicePool.remorseRoll = true;
 
   return dicePool;
 }
 
 function handleHumanityRoll(input) {
-  log("Humanity Roll");
-  log(input);
-  let dice = input.skill + input.modifier;
-  if (dice <= 0) {
-    vtmGlobal.luckydice = true;
-    dice = 1;
-  }
-
-  let dicePool = new DicePool(dice, 0);
+  let dicePool = createDicePool(input, true);
 
   return dicePool;
 }
@@ -640,6 +580,31 @@ function setGraphics(value) {
   }
 }
 
+function createDicePool(args, allowLucky = false) {
+  const allowableArgs = [
+    'attribute',
+    'skill',
+    'modifier',
+    'willpower',
+  ];
+  const sumDice = (dice, attr) => dice + args[attr];
+
+  let totalDice = allowableArgs.reduce(sumDice, 0) || 0;
+  let redDice = args.hunger;
+
+  return new DicePool(totalDice, redDice, allowLucky);
+}
+
+function DicePool (total, redDice, allowLucky = false) {
+  if (total <= 0 && allowLucky) {
+    this.lucky = true;
+    total = 1;
+  }
+
+  this.blackDice = Math.max(0, total - redDice);
+  this.redDice = redDice;
+}
+
 // Performs basic happy-path testing.
 // Test cases are non-exhaustive as of current.
 function runTestSuite() {
@@ -649,7 +614,11 @@ function runTestSuite() {
   };
   const compare = (given, expected) => {
     for (const [key, expectation] of Object.entries(expected)) {
-      if (given[key] !== expectation) return false;
+      if (given[key] !== expectation) {
+        log(`Expected: ${JSON.stringify(expected)}`);
+        log(`Actual: ${JSON.stringify(given)}`);
+        return false;
+      }
     }
     return true;
   };
@@ -659,6 +628,7 @@ function runTestSuite() {
   let simpleVars = prepVars('!vtm roll w2 r2');
   let simpleDicePool = handleSimpleRoll(simpleVars);
   let simpleExpected = { blackDice: 2, redDice: 2 };
+  log('Simple:');
   testResults['Simple'] = compare(simpleDicePool, simpleExpected);
 
   let atrVars = prepVars('!vtm atr a3 r2 m2');
@@ -678,7 +648,8 @@ function runTestSuite() {
 
   let rouseVars = prepVars('!vtm rouse');
   let rouseDicePool = handleRouseRoll(rouseVars);
-  let rouseExpected = { blackDice: 0, redDice: 0, rouseStatRoll: true };
+  let rouseExpected = { blackDice: 0, redDice: 1, rouseStatRoll: true };
+  log('Rouse:');
   testResults['Rouse'] = compare(rouseDicePool, rouseExpected);
 
   let rerollVars = prepVars('!vtm reroll w3');
@@ -695,11 +666,6 @@ function runTestSuite() {
   Object.entries(testResults).forEach(([test, result]) => {
     log(`${result ? 'Pass' : 'Fail'} for test '${test}'`);
   });
-}
-
-function DicePool (black, red) {
-  this.blackDice = black;
-  this.redDice = red;
 }
 
 // Allows this script to run in local node instances
