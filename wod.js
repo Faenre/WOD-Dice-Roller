@@ -18,16 +18,36 @@ const vtmCONSTANTS = {
   IMG: {
     DICE: {
       NORMAL: {
-        BOTCH: "https://i.imgur.com/BhwBgoy.png",
-        MISS: "https://i.imgur.com/jz6fhT2.png",
-        PASS: "https://i.imgur.com/zjhWSpA.png",
-        CRIT: "https://i.imgur.com/JuE1DTR.png"
+        // botch:
+        1:  "https://i.imgur.com/BhwBgoy.png",
+        // miss:
+        2:  "https://i.imgur.com/jz6fhT2.png",
+        3:  "https://i.imgur.com/jz6fhT2.png",
+        4:  "https://i.imgur.com/jz6fhT2.png",
+        5:  "https://i.imgur.com/jz6fhT2.png",
+        // success:
+        6:  "https://i.imgur.com/zjhWSpA.png",
+        7:  "https://i.imgur.com/zjhWSpA.png",
+        8:  "https://i.imgur.com/zjhWSpA.png",
+        9:  "https://i.imgur.com/zjhWSpA.png",
+        // crit:
+        10: "https://i.imgur.com/JuE1DTR.png"
       },
       MESSY: {
-        BOTCH: "https://i.imgur.com/41ZXRdA.png",
-        MISS: "https://i.imgur.com/ipwOggU.png",
-        PASS: "https://i.imgur.com/9FzRKxA.png",
-        CRIT: "https://i.imgur.com/xUhtSHU.png"
+        // botch:
+        1:  "https://i.imgur.com/41ZXRdA.png",
+        // miss:
+        2:  "https://i.imgur.com/ipwOggU.png",
+        3:  "https://i.imgur.com/ipwOggU.png",
+        4:  "https://i.imgur.com/ipwOggU.png",
+        5:  "https://i.imgur.com/ipwOggU.png",
+        // success:
+        6:  "https://i.imgur.com/9FzRKxA.png",
+        7:  "https://i.imgur.com/9FzRKxA.png",
+        8:  "https://i.imgur.com/9FzRKxA.png",
+        9:  "https://i.imgur.com/9FzRKxA.png",
+        // crit:
+        10: "https://i.imgur.com/xUhtSHU.png"
       }
     }
   },
@@ -109,19 +129,15 @@ function formatCommandLineArguments(chatCommand) {
 function processDebugScript(argv) {
   // this will run the various other scripts depending upon the chat
   // window command.  Just add another Case statement to add a new command.
-  switch (argv[1]) {
-    case "log":
-      setLogging(argv[1]);
-      break;
-    case "graphics":
-      setGraphics(argv[1]);
-      break;
-  }
+  return {
+    log: setLogging,
+    graphics: setGraphics,
+  }(argv[1]);
 }
 
 function processVampireDiceScript(argv, who) {
   let input = parseCommandLineVariables(argv, who);
-  let dicePool = calculateRunScript(input);
+  let dicePool = calculateRunScript(input)(input);
   dicePool.user = input.user;
   dicePool.rollname = input.rollname;
 
@@ -223,16 +239,15 @@ function parseCommandLineVariables(argv, who) {
 
 // Decides how to distribute dice based on the type of roll
 function calculateRunScript(input) {
-  switch (input.type) {
-    case 'atr':
-    case 'skill':     return handleSkillRoll(input);
-    case 'will':      return handleWillpowerRoll(input);
-    case 'rouse':     return handleRouseRoll(input);
-    case 'frenzy':    return handleFrenzyRoll(input);
-    case 'remorse':   return handleRemorseRoll(input);
-    case 'humanity':  return handleHumanityRoll(input);
-    default:          return handleSimpleRoll(input);
-  }
+  return {
+    atr:      handleSkillRoll,
+    skill:    handleSkillRoll,
+    will:     handleWillpowerRoll,
+    rouse:    handleRouseRoll,
+    frenzy:   handleFrenzyRoll,
+    humanity: handleHumanityRoll,
+    simple:   handleSimpleRoll,
+  }[input.type](input);
 }
 
 function vtmRollDiceSuperFunc(dicePool) {
@@ -417,19 +432,7 @@ function rollVTMDice(diceQty, type) {
  */
 function getDiceImage(type, roll) {
   let imgPool = vtmCONSTANTS.IMG.DICE[(type === 'v') ? 'NORMAL' : 'MESSY'];
-  switch (roll) {
-    case 1:   return imgPool.BOTCH;
-    case 2:
-    case 3:
-    case 4:
-    case 5:   return imgPool.MISS;
-    case 6:
-    case 7:
-    case 8:
-    case 9:   return imgPool.PASS;
-    case 10:  return imgPool.CRIT;
-    default:  return null;
-  }
+  return imgPool[roll];
 }
 
 function addRollDeclarations(diceTotals, outputMessage, endTemplateSection, thebeast) {
