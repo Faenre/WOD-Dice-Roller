@@ -4,6 +4,12 @@ This is a modified version of the dice mechanics originally created by Konrad J 
 
 This app is currently under heavy revision and refactoring. See [the trello](https://trello.com/b/Qw6BLmaQ/wod-dice-mechanics) for current status.
 
+# Setup
+
+Grab the `wod.js` file and copy the contents into roll20. It's the only file you need.
+
+For development, pull everything. To run tests, run `npm install`,  and `jest`.
+
 # Usage
 
 There are several different types of rolls.
