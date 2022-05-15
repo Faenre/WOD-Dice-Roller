@@ -84,8 +84,8 @@ function performInlineRolls(msg) {
       accumulator['$[[' + index + ']]'] = currentValue.results.total || 0;
       return accumulator;
     }, {})
-    .reduce(function (m, v, k) {
-      return m.replace(k, v);
+    .reduce(function (accumulator, currentValue, index) {
+      return accumulator.replace(currentValue, index);
     }, msg.content)
     .value();
 
@@ -93,11 +93,15 @@ function performInlineRolls(msg) {
 }
 
 function formatCommandLineArguments(chatCommand) {
-  vtmGlobal.reroll = chatCommand.replace(/"/g, '&quot;').replace(/~/g, '&#126;');
+  vtmGlobal.reroll = chatCommand
+    .replace(/"/g, '&quot;')
+    .replace(/~/g, '&#126;');
 
-  let argv = [].concat.apply([], chatCommand.split('~').map(function (v, i) {
-    return i % 2 ? v : v.split(' ');
-  })).filter(Boolean);
+  let argv = []
+    .concat
+    .apply([], chatCommand.split('~').map(function (value, index) {
+      return index % 2 ? value : value.split(' ');
+    })).filter(Boolean);
 
   return argv;
 }
@@ -111,9 +115,6 @@ function processDebugScript(argv) {
       break;
     case "graphics":
       setGraphics(argv[1]);
-      break;
-    case "test":
-      runTestSuite();
       break;
   }
 }
@@ -501,7 +502,7 @@ function handleFrenzyRoll(input) {
 }
 
 function handleSimpleRoll(input) {
-  let args = Object.create(input)
+  let args = Object.create(input);
   args.modifier = (args.modifier || 0) + (args.hunger || 0);
 
   return new DicePool(args, false);
