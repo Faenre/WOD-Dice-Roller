@@ -477,27 +477,23 @@ function addRollDeclarations(diceTotals, outputMessage, endTemplateSection, theb
 }
 
 function handleSkillRoll(input) {
-  let dicePool = createDicePool(input, true);
-
-  return dicePool;
+  return new DicePool(input, true);
 }
 
 function handleWillpowerRoll(input) {
-  let dicePool = createDicePool(input, true);
-
-  return dicePool;
+  return new DicePool(input, true);
 }
 
 function handleRouseRoll(input) {
-  let args = {hunger: Math.max(1, input.modifier)};
-  let dicePool = createDicePool(args);
+  let args = {hunger: Math.max(1, input.modifier || 0)};
+  let dicePool = new DicePool(args);
   dicePool.rouseStatRoll = true;
 
   return dicePool;
 }
 
 function handleFrenzyRoll(input) {
-  let dicePool = createDicePool(input, true);
+  let dicePool = new DicePool(input, true);
   dicePool.frenzyRoll = true;
   dicePool.difficulty = input.difficulty;
 
@@ -505,23 +501,21 @@ function handleFrenzyRoll(input) {
 }
 
 function handleSimpleRoll(input) {
-  input.modifier = (input.modifier || 0) + input.hunger;
-  let dicePool = createDicePool(input, false);
+  let args = Object.create(input)
+  args.modifier = (args.modifier || 0) + (args.hunger || 0);
 
-  return dicePool;
+  return new DicePool(args, false);
 }
 
 function handleRemorseRoll(input) {
-  let dicePool = createDicePool(input, true);
+  let dicePool = new DicePool(input, true);
   dicePool.remorseRoll = true;
 
   return dicePool;
 }
 
 function handleHumanityRoll(input) {
-  let dicePool = createDicePool(input, true);
-
-  return dicePool;
+  return new DicePool(input, true);
 }
 
 // Used for multistate checkboxes
@@ -580,7 +574,7 @@ function setGraphics(value) {
   }
 }
 
-function createDicePool(args, allowLucky = false) {
+function DicePool (args, allowLucky = false) {
   const allowableArgs = [
     'attribute',
     'skill',
@@ -589,13 +583,9 @@ function createDicePool(args, allowLucky = false) {
   ];
   const sumDice = (dice, attr) => dice + args[attr];
 
-  let totalDice = allowableArgs.reduce(sumDice, 0) || 0;
-  let redDice = args.hunger;
+  let total = allowableArgs.reduce(sumDice, 0) || 0;
+  let redDice = args.hunger || 0;
 
-  return new DicePool(totalDice, redDice, allowLucky);
-}
-
-function DicePool (total, redDice, allowLucky = false) {
   if (total <= 0 && allowLucky) {
     this.lucky = true;
     total = 1;
@@ -605,72 +595,28 @@ function DicePool (total, redDice, allowLucky = false) {
   this.redDice = redDice;
 }
 
-// Performs basic happy-path testing.
-// Test cases are non-exhaustive as of current.
-function runTestSuite() {
-  log('Running tests...');
-  const prepVars = (msg) => {
-    return parseCommandLineVariables(msg.split(' '), 'Sample User');
-  };
-  const compare = (given, expected) => {
-    for (const [key, expectation] of Object.entries(expected)) {
-      if (given[key] !== expectation) {
-        log(`Expected: ${JSON.stringify(expected)}`);
-        log(`Actual: ${JSON.stringify(given)}`);
-        return false;
-      }
-    }
-    return true;
-  };
-
-  const testResults = {};
-
-  let simpleVars = prepVars('!vtm roll w2 r2');
-  let simpleDicePool = handleSimpleRoll(simpleVars);
-  let simpleExpected = { blackDice: 2, redDice: 2 };
-  log('Simple:');
-  testResults['Simple'] = compare(simpleDicePool, simpleExpected);
-
-  let atrVars = prepVars('!vtm atr a3 r2 m2');
-  let atrDicePool = handleSkillRoll(atrVars);
-  let atrExpected = { blackDice: 3, redDice: 2 };
-  testResults['Attribute'] = compare(atrDicePool, atrExpected);
-
-  let skillVars = prepVars('!vtm skill a3 r2 m2');
-  let skillDicePool = handleSkillRoll(skillVars);
-  let skillExpected = { blackDice: 3, redDice: 2 };
-  testResults['Skill'] = compare(skillDicePool, skillExpected);
-
-  let willpowerVars = prepVars('!vtm will w3 a2 m1');
-  let willpowerDicePool = handleWillpowerRoll(willpowerVars);
-  let willpowerExpected = { blackDice: 6, redDice: 0 };
-  testResults['Willpower'] = compare(willpowerDicePool, willpowerExpected);
-
-  let rouseVars = prepVars('!vtm rouse');
-  let rouseDicePool = handleRouseRoll(rouseVars);
-  let rouseExpected = { blackDice: 0, redDice: 1, rouseStatRoll: true };
-  log('Rouse:');
-  testResults['Rouse'] = compare(rouseDicePool, rouseExpected);
-
-  let rerollVars = prepVars('!vtm reroll w3');
-  let rerollDicePool = handleSimpleRoll(rerollVars);
-  let rerollExpected = { blackDice: 3, redDice: 0 };
-  testResults['Reroll'] = compare(rerollDicePool, rerollExpected);
-
-  // TODO: either add tests for the following, or remove their implementation:
-  // * willpower (2nd version)
-  // * frenzy
-  // * remorse
-  // * humanity
-
-  Object.entries(testResults).forEach(([test, result]) => {
-    log(`${result ? 'Pass' : 'Fail'} for test '${test}'`);
-  });
-}
-
 // Allows this script to run in local node instances
 if (typeof on !== 'undefined') {
   on("chat:message", roll20ApiHandler);
 } else {
-  runTestSuite();
+  module.exports = {
+    rolls: {
+      handleSkillRoll,
+      handleWillpowerRoll,
+      handleRouseRoll,
+      handleFrenzyRoll,
+      handleSimpleRoll,
+      handleRemorseRoll,
+      handleHumanityRoll,
+    },
+    formatCommandLineArguments,
+    processDebugScript,
+    processVampireDiceScript,
+    parseCommandLineVariables,
+    calculateRunScript,
+    vtmRollDiceSuperFunc,
+    rollVTMDice,
+    getDiceImage,
+    addRollDeclarations,
+  };
 }
