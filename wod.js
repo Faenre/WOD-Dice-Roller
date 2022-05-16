@@ -600,7 +600,7 @@ function setLogging(value) {
     off: toggleChatLogging,
     single: toggleSingleLineRoll,
     multi: toggleSingleLineRoll,
-  }[value]();
+  }[value](value);
 }
 function toggleChatLogging(key) {
   vtmGlobal.diceLogChat = {
@@ -630,8 +630,8 @@ function setGraphics(value) {
     m:    setGraphicSize,
     l:    setGraphicSize,
     x:    setGraphicSize,
-    xx:   setGraphicSize
-  }[value]();
+    xx:   setGraphicSize,
+  }[value](value);
 }
 function toggleGraphics(key) {
   vtmGlobal.diceGraphicsChat = {
@@ -718,14 +718,9 @@ if (typeof on !== 'undefined') {
       handleRemorseRoll,
       handleHumanityRoll,
     },
-    formatCommandLineArguments,
-    processDebugScript,
-    processVampireDiceScript,
-    parseCommandLineVariables,
-    calculateRunScript,
-    vtmRollDiceSuperFunc,
-    rollVTMDice,
     getDiceImage,
-    addRollDeclarations,
+    createMessageBuilder,
+    setGraphics,
+    setLogging,
   };
 }
