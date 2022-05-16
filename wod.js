@@ -543,7 +543,6 @@ function scaleMultiboxValue(value, scaleNumber) {
   return value;
 }
 
-// Sets the logging status
 /**
  * Adjusts the output logging.
  *
@@ -553,24 +552,24 @@ function scaleMultiboxValue(value, scaleNumber) {
  * or to enable dice logging on one line or multiple.
  */
 function setLogging(value) {
-  function toggleChatLogging(key)
-    vtmGlobal.diceLogChat = {
-      on: true,
-      off: false
-    }[key];
-
-  function toggleSingleLineRoll(key)
-    vtmGlobal.diceLogRolledOnOneLine = {
-      single: true,
-      multi: false
-    }[key];
-
   return {
     on: toggleChatLogging,
     off: toggleChatLogging,
     single: toggleSingleLineRoll,
     multi: toggleSingleLineRoll,
   }[value]();
+}
+function toggleChatLogging(key) {
+  vtmGlobal.diceLogChat = {
+    on: true,
+    off: false
+  }[key];
+}
+function toggleSingleLineRoll(key) {
+  vtmGlobal.diceLogRolledOnOneLine = {
+    single: true,
+    multi: false
+  }[key];
 }
 
 /**
@@ -581,20 +580,6 @@ function setLogging(value) {
  * - s, m, l, x, xx
  */
 function setGraphics(value) {
-  function toggleGraphics(key)
-    vtmGlobal.diceGraphicsChat = {
-      on: true,
-      off: false
-    }[key];
-  function setGraphicSize(key)
-    vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE[{
-      s:  'SMALL',
-      m:  'MEDIUM',
-      l:  'LARGE',
-      x:  'XLARGE',
-      xx: 'XXLARGE'
-    }[key]];
-
   return {
     on:   toggleGraphics,
     off:  toggleGraphics,
@@ -603,7 +588,22 @@ function setGraphics(value) {
     l:    setGraphicSize,
     x:    setGraphicSize,
     xx:   setGraphicSize
-  }[value]()
+  }[value]();
+}
+function toggleGraphics(key) {
+  vtmGlobal.diceGraphicsChat = {
+    on: true,
+    off: false
+  }[key];
+}
+function setGraphicSize(key) {
+  vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE[{
+    s:  'SMALL',
+    m:  'MEDIUM',
+    l:  'LARGE',
+    x:  'XLARGE',
+    xx: 'XXLARGE'
+  }[key]];
 }
 
 /**
@@ -651,12 +651,12 @@ function DicePool (args, allowLucky = false) {
  */
 function Die (type) {
   const imgSet = {
-    'n': vtmCONSTANTS.IMG.DICE.NORMAL,
-    'h': vtmCONSTANTS.IMG.DICE.MESSY,
-  }[type]
+    n: vtmCONSTANTS.IMG.DICE.NORMAL,
+    h: vtmCONSTANTS.IMG.DICE.MESSY,
+  }[type];
 
   this.value = Math.floor(Math.random() * 10) + 1;
-  this.image = imgSet[this.value]
+  this.image = imgSet[this.value];
 }
 
 // Allows this script to run in local node instances
