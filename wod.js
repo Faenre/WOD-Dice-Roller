@@ -562,12 +562,24 @@ function setLogging(value) {
 }
 
 // Configures the graphics options (text vs image, and image sizes)
+/**
+ * Affects the image size configuration in the global environment.
+ *
+ * @param {string} value A string from below options:
+ * - on, off
+ * - s, m, l, x, xx
+ */
 function setGraphics(value) {
   if (value === 'on') {
     vtmGlobal.diceGraphicsChat = true;
   } else if (value === 'off') {
     vtmGlobal.diceGraphicsChat = false;
   } else {
+  }
+  function toggleGraphics(value) {
+    vtmGlobal.diceGraphicsChat = value;
+  }
+  function setGraphicSize(key)
     vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE[{
       s:  'SMALL',
       m:  'MEDIUM',
@@ -575,9 +587,25 @@ function setGraphics(value) {
       x:  'XLARGE',
       xx: 'XXLARGE'
     }[value]];
-  }
+
 }
 
+/**
+ * Represents a total pool of dice.
+ * Given a list of numbers which go into the dice pool, the current
+ * implementation separates them into black and red dice amounts.
+ *
+ * @todo Refactor this so that 'black dice' and 'red dice' are separate pools.
+ * @todo Create a 'flags' object instead of taking random flags from anywhere.
+ *
+ * @param {object} args An object that contains various numbers supplied by the
+ * command call, e.g. attribute, skill etc.
+ * These keys should all relate to integers.
+ * @param {boolean} allowLucky A "last resort" flag to indicate whether the roll
+ * should be given at least 1 die, no matter the modifiers.
+ *
+ * @returns {object} A collection of black and red dice values.
+ */
 function DicePool (args, allowLucky = false) {
   const allowableArgs = [
     'attribute',
@@ -597,6 +625,22 @@ function DicePool (args, allowLucky = false) {
 
   this.blackDice = Math.max(0, total - redDice);
   this.redDice = redDice;
+}
+
+/**
+ * Represents a single die roll.
+ *
+ * @param {string} type The type, 'n' for normal, 'h' for hunger
+ * @returns {object} with value and image attributes
+ */
+function Die (type) {
+  const imgSet = {
+    'n': vtmCONSTANTS.IMG.DICE.NORMAL,
+    'h': vtmCONSTANTS.IMG.DICE.MESSY,
+  }[type]
+
+  this.value = Math.floor(Math.random() * 10) + 1;
+  this.image = imgSet[this.value]
 }
 
 // Allows this script to run in local node instances
