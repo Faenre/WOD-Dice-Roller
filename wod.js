@@ -544,24 +544,35 @@ function scaleMultiboxValue(value, scaleNumber) {
 }
 
 // Sets the logging status
+/**
+ * Adjusts the output logging.
+ *
+ * @todo Either deprecate this, or provide examples
+ *
+ * @param {string} value A key as to whether to enable or disable chat logging,
+ * or to enable dice logging on one line or multiple.
+ */
 function setLogging(value) {
-  switch (value) {
-    case "on":
-      vtmGlobal.diceLogChat = true;
-      break;
-    case "off":
-      vtmGlobal.diceLogChat = false;
-      break;
-    case "multi":
-      vtmGlobal.diceLogRolledOnOneLine = false;
-      break;
-    case "single":
-      vtmGlobal.diceLogRolledOnOneLine = true;
-      break;
-  }
+  function toggleChatLogging(key)
+    vtmGlobal.diceLogChat = {
+      on: true,
+      off: false
+    }[key];
+
+  function toggleSingleLineRoll(key)
+    vtmGlobal.diceLogRolledOnOneLine = {
+      single: true,
+      multi: false
+    }[key];
+
+  return {
+    on: toggleChatLogging,
+    off: toggleChatLogging,
+    single: toggleSingleLineRoll,
+    multi: toggleSingleLineRoll,
+  }[value]();
 }
 
-// Configures the graphics options (text vs image, and image sizes)
 /**
  * Affects the image size configuration in the global environment.
  *
@@ -570,15 +581,11 @@ function setLogging(value) {
  * - s, m, l, x, xx
  */
 function setGraphics(value) {
-  if (value === 'on') {
-    vtmGlobal.diceGraphicsChat = true;
-  } else if (value === 'off') {
-    vtmGlobal.diceGraphicsChat = false;
-  } else {
-  }
-  function toggleGraphics(value) {
-    vtmGlobal.diceGraphicsChat = value;
-  }
+  function toggleGraphics(key)
+    vtmGlobal.diceGraphicsChat = {
+      on: true,
+      off: false
+    }[key];
   function setGraphicSize(key)
     vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE[{
       s:  'SMALL',
@@ -586,8 +593,17 @@ function setGraphics(value) {
       l:  'LARGE',
       x:  'XLARGE',
       xx: 'XXLARGE'
-    }[value]];
+    }[key]];
 
+  return {
+    on:   toggleGraphics,
+    off:  toggleGraphics,
+    s:    setGraphicSize,
+    m:    setGraphicSize,
+    l:    setGraphicSize,
+    x:    setGraphicSize,
+    xx:   setGraphicSize
+  }[value]()
 }
 
 /**
