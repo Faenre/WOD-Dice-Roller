@@ -186,7 +186,7 @@ function processVampireDiceScript(argv, who) {
   dicePool.user = input.user;
   dicePool.rollname = input.rollname;
 
-  return vtmRollDiceSuperFunc(dicePool);
+  vtmRollDiceSuperFunc(dicePool);
 }
 
 function parseCommandLineVariables(argv, who) {
@@ -651,18 +651,16 @@ function setGraphicSize(key) {
  * Given a list of numbers which go into the dice pool, the current
  * implementation separates them into black and red dice amounts.
  *
- * @todo Refactor this so that 'black dice' and 'red dice' are separate pools.
- * @todo Create a 'flags' object instead of taking random flags from anywhere.
- *
- * @param {object} args An object that contains various numbers supplied by the
- * command call, e.g. attribute, skill etc.
+ * @param {object} args An object that contains various numbers supplied
+ * by the command call, e.g. attribute, skill etc.
  * These keys should all relate to integers.
- * @param {boolean} allowLucky A "last resort" flag to indicate whether the roll
- * should be given at least 1 die, no matter the modifiers.
+ * @param {boolean} allowLucky A "last resort" flag to indicate whether
+ * the roll should be given at least 1 die, no matter the modifiers.
  *
  * @returns {object} A collection of black and red dice values.
  */
 function WodRoll (args, allowLucky = false) {
+  this.flags = {};
   const allowableArgs = [
     'attribute',
     'skill',
@@ -670,7 +668,6 @@ function WodRoll (args, allowLucky = false) {
     'willpower',
   ];
   const sumDice = (dice, attr) => dice + args[attr];
-  this.flags = {};
 
   let total = allowableArgs.reduce(sumDice, 0) || 0;
   let redDice = args.hunger || 0;
@@ -680,8 +677,8 @@ function WodRoll (args, allowLucky = false) {
     total = 1;
   }
 
-  let black = new DicePool('n', Math.max(0, total - redDice));
-  let red = new DicePool('h', redDice);
+  let black = new DicePool('NORMAL', Math.max(0, total - redDice));
+  let red = new DicePool('HUNGER', redDice);
 
   this.blackDice = black.count;
   this.redDice = red.count;
@@ -708,14 +705,11 @@ function DicePool (type, count) {
 /**
  * Represents a single die roll.
  *
- * @param {string} type The type, 'n' for normal, 'h' for hunger
+ * @param {string} type The type, 'NORMAL' or 'HUNGER'
  * @returns {object} with value and image attributes
  */
 function Die (type) {
-  const imgSet = {
-    n: vtmCONSTANTS.IMG.DICE.NORMAL,
-    h: vtmCONSTANTS.IMG.DICE.MESSY,
-  }[type];
+  const imgSet = vtmCONSTANTS.IMG.DICE[type];
 
   this.value = Math.floor(Math.random() * 10) + 1;
   this.image = imgSet[this.value];
@@ -738,8 +732,12 @@ if (typeof on === 'function') {
       handleHumanityRoll,
     },
     getDiceImage,
+    calculateRunScript,
     createMessageBuilder,
     setGraphics,
     setLogging,
+    WodRoll,
+    DicePool,
+    Die,
   };
 }

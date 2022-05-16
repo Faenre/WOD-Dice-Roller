@@ -8,6 +8,15 @@ const args = {
   hunger: 1,
 };
 
+test('calculateRunScript returns a WodRoll', () => {
+  const keys = ['atr', 'frenzy', 'humanity', 'remorse', 'rouse', 'simple', 'skill', 'will'];
+  let input = {modifier: 1};
+  for (key of keys) {
+    input.type = key;
+    expect(wod.calculateRunScript(input).__proto__).toBe(wod.WodRoll.prototype);
+  }
+});
+
 test('handleSkillRoll handles base case', () => {
   let pool = wod.rolls.handleSkillRoll(args);
   expect(pool.blackDice).toBe(3);
