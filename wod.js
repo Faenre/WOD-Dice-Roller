@@ -1,5 +1,6 @@
-if (typeof log === 'undefined') var log = (...args) => console.log(...args);
-if (typeof sendChat === 'undefined') var sendChat = log;
+var log = log || ((...args) => console.log(...args));
+var sendChat = sendChat || log;
+var on = on || false;
 
 const vtmCONSTANTS = {
   VTMCOMMAND: "!vtm",
@@ -115,7 +116,6 @@ const vtmGlobal = {
   diceGraphicResult: "",
   diceGraphicResultLog: "",
   diceLogRolledOnOneLine: false,
-  luckydice: false,
   reroll: ""
 };
 
@@ -363,7 +363,7 @@ function vtmRollDiceSuperFunc(dicePool) {
     }
   }
 
-  if (dicePool.rouseStatRoll) {
+  if (dicePool.flags.rouse) {
     let critScore = diceTotals.critScore + diceTotals.muddyCritScore;
     let critBonus = Math.floor(critScore / 2) * 2;
     let score = diceTotals.successScore + critBonus;
@@ -374,29 +374,27 @@ function vtmRollDiceSuperFunc(dicePool) {
     } else {
       messageBuilder.addBanner('Beast', 'HUNGER_NO_GAIN');
     }
-  } else if (dicePool.frenzyRoll) {
+  } else if (dicePool.flags.frenzy) {
     messageBuilder.addSection(`Successes=${diceTotals.successScore}`);
     if (diceTotals.successScore >= dicePool.difficulty) {
       messageBuilder.addBanner('Beast', 'FRENZY_RESIST');
     } else {
       messageBuilder.addBanner('Beast', 'FRENZY');
     }
-  } else if (dicePool.remorseRoll) {
+  } else if (dicePool.flags.remorse) {
     messageBuilder.addSection(`Successes=${diceTotals.successScore}`);
     if (diceTotals.successScore > 0) {
       messageBuilder.addBanner('Beast', 'REMORSE_PASS');
     } else {
       messageBuilder.addBanner('Beast', 'REMORSE_FAIL');
     }
-
-    if (vtmGlobal.luckydice) {
-      messageBuilder.addBanner('Fate', 'LAST_RESORT');
-    }
   } else {
     addRollDeclarations(diceTotals, messageBuilder);
   }
 
-  vtmGlobal.luckydice = false;
+  if (dicePool.flags.lucky) {
+    messageBuilder.addBanner('Fate', 'LAST_RESORT');
+  }
   messageBuilder.addSection(`Reroll=[Reroll](${vtmGlobal.reroll})`);
 
   log("Output");
@@ -481,7 +479,6 @@ function addRollDeclarations(diceTotals, messageBuilder) {
   let score = diceTotals.successScore + critBonus;
   messageBuilder.addSection(`Successes=${score}`);
 
-  if (vtmGlobal.luckydice) messageBuilder.addBanner('Fate', 'LAST_RESORT');
   if (!diceTotals.successScore) messageBuilder.addBanner('Fate', 'MISS_FAIL');
 
   let isMuddy = diceTotals.muddyCritScore === 1 && (diceTotals.critScore >= 1);
@@ -524,45 +521,45 @@ function bannerImage(banner) {
 }
 
 function handleSkillRoll(input) {
-  return new DicePool(input, true);
+  return new WodRoll(input, true);
 }
 
 function handleWillpowerRoll(input) {
-  return new DicePool(input, true);
+  return new WodRoll(input, true);
 }
 
 function handleRouseRoll(input) {
   let args = {hunger: Math.max(1, input.modifier || 0)};
-  let dicePool = new DicePool(args);
-  dicePool.rouseStatRoll = true;
+  let pool = new WodRoll(args);
+  pool.flags.rouse = true;
 
-  return dicePool;
+  return pool;
 }
 
 function handleFrenzyRoll(input) {
-  let dicePool = new DicePool(input, true);
-  dicePool.frenzyRoll = true;
-  dicePool.difficulty = input.difficulty;
+  let pool = new WodRoll(input, true);
+  pool.flags.frenzy = true;
+  pool.difficulty = input.difficulty;
 
-  return dicePool;
+  return pool;
 }
 
 function handleSimpleRoll(input) {
   let args = Object.create(input);
   args.modifier = (args.modifier || 0) + (args.hunger || 0);
 
-  return new DicePool(args, false);
+  return new WodRoll(args, false);
 }
 
 function handleRemorseRoll(input) {
-  let dicePool = new DicePool(input, true);
-  dicePool.remorseRoll = true;
+  let pool = new WodRoll(input, true);
+  pool.flags.remorse = true;
 
-  return dicePool;
+  return pool;
 }
 
 function handleHumanityRoll(input) {
-  return new DicePool(input, true);
+  return new WodRoll(input, true);
 }
 
 // Used for multistate checkboxes
@@ -596,19 +593,19 @@ function scaleMultiboxValue(value, scaleNumber) {
  */
 function setLogging(value) {
   return {
-    on: toggleChatLogging,
-    off: toggleChatLogging,
-    single: toggleSingleLineRoll,
-    multi: toggleSingleLineRoll,
+    on: setChatLogging,
+    off: setChatLogging,
+    single: setSingleLineRollLogging,
+    multi: setSingleLineRollLogging,
   }[value](value);
 }
-function toggleChatLogging(key) {
+function setChatLogging(key) {
   vtmGlobal.diceLogChat = {
     on: true,
     off: false
   }[key];
 }
-function toggleSingleLineRoll(key) {
+function setSingleLineRollLogging(key) {
   vtmGlobal.diceLogRolledOnOneLine = {
     single: true,
     multi: false
@@ -624,8 +621,8 @@ function toggleSingleLineRoll(key) {
  */
 function setGraphics(value) {
   return {
-    on:   toggleGraphics,
-    off:  toggleGraphics,
+    on:   setGraphicsEnabled,
+    off:  setGraphicsEnabled,
     s:    setGraphicSize,
     m:    setGraphicSize,
     l:    setGraphicSize,
@@ -633,7 +630,7 @@ function setGraphics(value) {
     xx:   setGraphicSize,
   }[value](value);
 }
-function toggleGraphics(key) {
+function setGraphicsEnabled(key) {
   vtmGlobal.diceGraphicsChat = {
     on: true,
     off: false
@@ -665,7 +662,7 @@ function setGraphicSize(key) {
  *
  * @returns {object} A collection of black and red dice values.
  */
-function DicePool (args, allowLucky = false) {
+function WodRoll (args, allowLucky = false) {
   const allowableArgs = [
     'attribute',
     'skill',
@@ -673,17 +670,39 @@ function DicePool (args, allowLucky = false) {
     'willpower',
   ];
   const sumDice = (dice, attr) => dice + args[attr];
+  this.flags = {};
 
   let total = allowableArgs.reduce(sumDice, 0) || 0;
   let redDice = args.hunger || 0;
 
   if (total <= 0 && allowLucky) {
-    this.lucky = true;
+    this.flags.lucky = true;
     total = 1;
   }
 
-  this.blackDice = Math.max(0, total - redDice);
-  this.redDice = redDice;
+  let black = new DicePool('n', Math.max(0, total - redDice));
+  let red = new DicePool('h', redDice);
+
+  this.blackDice = black.count;
+  this.redDice = red.count;
+}
+
+/**
+ * Represents a single dice pool (black, red, purple, ...)
+ *
+ * @param {string} type The type, 'n' for normal, 'h' for hunger
+ * @param {int} count The number of dice to roll
+ */
+function DicePool (type, count) {
+  let dice = Array(count)
+    .fill()
+    .map(() => new Die(type));
+
+  this.count = count;
+  this.successes = dice.filter((die) => die.value >= 6);
+  this.crits = dice.filter((die) => die.value === 10);
+  this.botches = dice.filter((die) => die.value === 1);
+  this.images = dice.map((die) => die.image).join('');
 }
 
 /**
@@ -703,7 +722,7 @@ function Die (type) {
 }
 
 // Allows this script to run in local node instances
-if (typeof on !== 'undefined') {
+if (typeof on === 'function') {
   on("chat:message", roll20ApiHandler);
 } else {
   module.exports = {

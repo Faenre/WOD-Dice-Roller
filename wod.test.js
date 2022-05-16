@@ -25,7 +25,7 @@ test('handleRouseRoll handles base case', () => {
 
   expect(pool.blackDice).toBe(0);
   expect(pool.redDice).toBe(1);
-  expect(pool.rouseStatRoll).toBe(true);
+  expect(pool.flags.rouse).toBe(true);
 });
 test('handleRouseRoll accepts modifier argument', () => {
   let args2 = Object.create(args);
@@ -34,7 +34,7 @@ test('handleRouseRoll accepts modifier argument', () => {
 
   expect(pool.blackDice).toBe(0);
   expect(pool.redDice).toBe(10);
-  expect(pool.rouseStatRoll).toBe(true);
+  expect(pool.flags.rouse).toBe(true);
 });
 
 test('handleSimpleRoll doesnt subtract hunger from total', () => {
@@ -47,14 +47,14 @@ test('handleFrenzyRoll handles base case', () => {
   let pool = wod.rolls.handleFrenzyRoll(args);
   expect(pool.blackDice).toBe(3);
   expect(pool.redDice).toBe(1);
-  expect(pool.frenzyRoll).toBe(true);
+  expect(pool.flags.frenzy).toBe(true);
 });
 
 test('handleRemorseRoll handles base case', () => {
   let pool = wod.rolls.handleRemorseRoll(args);
   expect(pool.blackDice).toBe(3);
   expect(pool.redDice).toBe(1);
-  expect(pool.remorseRoll).toBe(true);
+  expect(pool.flags.remorse).toBe(true);
 });
 
 test('handleHumanityRoll handles base case', () => {
