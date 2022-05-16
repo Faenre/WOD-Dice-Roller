@@ -49,6 +49,52 @@ const vtmCONSTANTS = {
         // crit:
         10: "https://i.imgur.com/xUhtSHU.png"
       }
+    },
+    BANNERS: {
+      BEAST: {
+        URL: 'https://i.imgur.com/6N0Ld40.png',
+        TITLE: 'The Beast',
+      },
+      HUNGER_GAIN: {
+        URL: 'https://i.imgur.com/UV57YLP.png',
+        TITLE: 'Hunger Gain',
+      },
+      HUNGER_NO_GAIN: {
+        URL: 'https://i.imgur.com/b3NHCNk.png',
+        TITLE: 'Rousing Success',
+      },
+      FRENZY_RESIST: {
+        URL: 'https://raw.githubusercontent.com/Roll20/roll20-character-sheets/master/vampire-v5/Banners/FrenzyRestrained.png',
+        TITLE: 'Frenzy Restrained',
+      },
+      FRENZY: {
+        URL: 'https://raw.githubusercontent.com/Roll20/roll20-character-sheets/master/vampire-v5/Banners/Frenzy.png',
+        TITLE: 'Frenzy',
+      },
+      REMORSE_PASS: {
+        URL: 'https://i.imgur.com/zubTvLd.png',
+        TITLE: 'Guilty',
+      },
+      REMORSE_FAIL: {
+        URL: 'https://i.imgur.com/21qrGX5.png',
+        TITLE: 'Innocent',
+      },
+      LAST_RESORT: {
+        URL: 'https://i.imgur.com/4XbkQua.png',
+        TITLE: 'Last Resort',
+      },
+      MISS_FAIL: {
+        URL: 'https://raw.githubusercontent.com/Roll20/roll20-character-sheets/master/vampire-v5/Banners/MissFail.png',
+        TITLE: 'Miss',
+      },
+      MESSY: {
+        URL: 'https://i.imgur.com/KZTTwlE.png',
+        TITLE: 'Messy',
+      },
+      CRIT: {
+        URL: 'https://i.imgur.com/XNA64u9.png',
+        TITLE: 'Crit',
+      }
     }
   },
   BASEDC:{
@@ -68,7 +114,6 @@ const vtmGlobal = {
   diceTextResultLog: "",
   diceGraphicResult: "",
   diceGraphicResultLog: "",
-  diceTestEnabled: false,
   diceLogRolledOnOneLine: false,
   luckydice: false,
   reroll: ""
@@ -137,7 +182,7 @@ function processDebugScript(argv) {
 
 function processVampireDiceScript(argv, who) {
   let input = parseCommandLineVariables(argv, who);
-  let dicePool = calculateRunScript(input)(input);
+  let dicePool = calculateRunScript(input);
   dicePool.user = input.user;
   dicePool.rollname = input.rollname;
 
@@ -241,12 +286,13 @@ function parseCommandLineVariables(argv, who) {
 function calculateRunScript(input) {
   return {
     atr:      handleSkillRoll,
-    skill:    handleSkillRoll,
-    will:     handleWillpowerRoll,
-    rouse:    handleRouseRoll,
     frenzy:   handleFrenzyRoll,
     humanity: handleHumanityRoll,
+    remorse:  handleRemorseRoll,
+    rouse:    handleRouseRoll,
     simple:   handleSimpleRoll,
+    skill:    handleSkillRoll,
+    will:     handleWillpowerRoll,
   }[input.type](input);
 }
 
@@ -294,78 +340,69 @@ function vtmRollDiceSuperFunc(dicePool) {
     diceTextLog: "Normal" + attackDiceResults.diceTextLog + "Hunger" + defendDiceResults.diceTextLog
   };
 
-  if (vtmGlobal.diceTestEnabled === true) {
-    sendChat("", "/desc " + user + ": v1 h1");
-  }
+  let messageBuilder = createMessageBuilder();
+  messageBuilder.addSection(`name=${user}`);
 
-  let endTemplateSection = "}} ";
-  let outputMessage = "&{template:wod} {{name=" + user + endTemplateSection;
-
-  if (dicePool.rollname) {
-    outputMessage += "{{Rollname=" + dicePool.rollname + endTemplateSection;
-  }
+  if (dicePool.rollname) messageBuilder.addSection(`Rollname=${dicePool.rollname}`);
 
   if (vtmGlobal.diceLogChat === true) {
     if (vtmGlobal.diceLogRolledOnOneLine === true) {
       diceGraphicsRolled = diceTotals.diceGraphicsLog;
       diceTextRolled = diceTotals.diceTextLog;
       if (vtmGlobal.diceGraphicsChat === true) {
-        outputMessage += "{{Roll=" + diceGraphicsRolled + endTemplateSection;
+        messageBuilder.addSection(`Roll=${diceGraphicsRolled}`);
       } else {
-        outputMessage += "{{Roll=" + diceTextRolled + endTemplateSection;
+        messageBuilder.addSection(`Roll=${diceTextRolled}`);
       }
     } else if (vtmGlobal.diceGraphicsChat === true) {
-      outputMessage += "{{Normal=" + attackDiceResults.diceGraphicsLog + endTemplateSection;
-      outputMessage += "{{Hunger=" + defendDiceResults.diceGraphicsLog + endTemplateSection;
+      messageBuilder.addSection(`Normal=${attackDiceResults.diceGraphicsLog}`);
+      messageBuilder.addSection(`Hunger=${defendDiceResults.diceGraphicsLog}`);
     } else {
-      outputMessage += "{{Normal=" + attackDiceResults.diceTextLog + endTemplateSection;
-      outputMessage += "{{Hunger=" + defendDiceResults.diceTextLog + endTemplateSection;
+      messageBuilder.addSection(`Normal=${attackDiceResults.diceTextLog}`);
+      messageBuilder.addSection(`Hunger=${defendDiceResults.diceTextLog}`);
     }
   }
 
-  let thebeast = '<img src="https://i.imgur.com/6N0Ld40.png" title="The Beast" height="20" width="228"/>';
-
   if (dicePool.rouseStatRoll) {
-    let critBonus = Math.floor((diceTotals.critScore + diceTotals.muddyCritScore) / 2.0) * 2.0;
-    outputMessage += "{{Successes=" + (diceTotals.successScore + critBonus) + endTemplateSection;
-    if (diceTotals.successScore > 0) {
-      outputMessage += "{{Beast=" + '<img src="https://i.imgur.com/UV57YLP.png" title="Hunger Gain" height="20" width="228"/>' + endTemplateSection;
-    } else {
-      outputMessage += "{{Beast=" + '<img src="https://i.imgur.com/b3NHCNk.png" title="Rousing Success" height="20" width="228"/>' + endTemplateSection;
+    let critScore = diceTotals.critScore + diceTotals.muddyCritScore;
+    let critBonus = Math.floor(critScore / 2) * 2;
+    let score = diceTotals.successScore + critBonus;
 
+    messageBuilder.addSection(`Successes=${score}`);
+    if (diceTotals.successScore > 0) {
+      messageBuilder.addBanner('Beast', 'HUNGER_GAIN');
+    } else {
+      messageBuilder.addBanner('Beast', 'HUNGER_NO_GAIN');
     }
   } else if (dicePool.frenzyRoll) {
-    outputMessage += "{{Successes=" + diceTotals.successScore + endTemplateSection;
+    messageBuilder.addSection(`Successes=${diceTotals.successScore}`);
     if (diceTotals.successScore >= dicePool.difficulty) {
-      outputMessage += "{{Beast=" + '<img src="https://raw.githubusercontent.com/Roll20/roll20-character-sheets/master/vampire-v5/Banners/FrenzyRestrained.png" title="Frenzy Restrained" height="20" width="228"/>' + endTemplateSection;
+      messageBuilder.addBanner('Beast', 'FRENZY_RESIST');
     } else {
-      outputMessage += "{{Beast=" + '<img src="https://raw.githubusercontent.com/Roll20/roll20-character-sheets/master/vampire-v5/Banners/Frenzy.png" title="Frenzy" height="20" width="228"/>' + endTemplateSection;
+      messageBuilder.addBanner('Beast', 'FRENZY');
     }
   } else if (dicePool.remorseRoll) {
-    outputMessage += "{{Successes=" + diceTotals.successScore + endTemplateSection;
+    messageBuilder.addSection(`Successes=${diceTotals.successScore}`);
     if (diceTotals.successScore > 0) {
-      outputMessage += "{{Beast=" + '<img src="https://i.imgur.com/zubTvLd.png" title="Guilty" height="20" width="228"/>' + endTemplateSection;
+      messageBuilder.addBanner('Beast', 'REMORSE_PASS');
     } else {
-      outputMessage += "{{Beast=" + '<img src="https://i.imgur.com/21qrGX5.png" title="Innocent" height="20" width="228"/>' + endTemplateSection;
-
+      messageBuilder.addBanner('Beast', 'REMORSE_FAIL');
     }
 
     if (vtmGlobal.luckydice) {
-      let lastResort = '<img src="https://i.imgur.com/4XbkQua.png" title="Miss" height="20" width="228"/>';
-      outputMessage += "{{Fate=" + lastResort + endTemplateSection;
+      messageBuilder.addBanner('Fate', 'LAST_RESORT');
     }
   } else {
-    outputMessage = addRollDeclarations(diceTotals, outputMessage, endTemplateSection, thebeast);
+    addRollDeclarations(diceTotals, messageBuilder);
   }
 
   vtmGlobal.luckydice = false;
-  outputMessage += "{{Reroll=[Reroll](" + vtmGlobal.reroll + ")" + endTemplateSection;
+  messageBuilder.addSection(`Reroll=[Reroll](${vtmGlobal.reroll})`);
 
   log("Output");
-  log(outputMessage);
-  if (!vtmGlobal.diceTestEnabled) {
-    sendChat(user, outputMessage);
-  }
+  log(messageBuilder.getMessage());
+
+  sendChat(user, messageBuilder.getMessage());
 }
 
 function rollVTMDice(diceQty, type) {
@@ -382,15 +419,16 @@ function rollVTMDice(diceQty, type) {
 
   // Used to build images
   function imgUrlBuilder(image, roll) {
-    return `<img src="${image}" title="${roll}" height="${vtmGlobal.diceGraphicsChatSize}" width="${vtmGlobal.diceGraphicsChatSize}" />`;
-  }
-
-  if (vtmGlobal.diceTestEnabled === true) {
-    diceQty = 10;
+    return `<img \
+    src="${image}" \
+    title="${roll}" \
+    height="${vtmGlobal.diceGraphicsChatSize}" \
+    width="${vtmGlobal.diceGraphicsChatSize}" \
+    />`;
   }
 
   for (let i = 1; i <= diceQty; i++) {
-    let  roll = Math.floor(Math.random() * 10) + 1;
+    let roll = Math.floor(Math.random() * 10) + 1;
 
     let image = getDiceImage(type, roll);
     diceResult.diceTextLog += `(${roll})`;
@@ -435,49 +473,54 @@ function getDiceImage(type, roll) {
   return imgPool[roll];
 }
 
-function addRollDeclarations(diceTotals, outputMessage, endTemplateSection, thebeast) {
-  // Crit bonus is + 2 successes for each PAIR of crits. Thus 2 crits is + 2 successs, 3 crits is + 2 successes.
-  let critBonus = Math.floor((diceTotals.critScore + diceTotals.muddyCritScore) / 2.0) * 2.0;
-  outputMessage += "{{Successes=" + (diceTotals.successScore + critBonus) + endTemplateSection;
+function addRollDeclarations(diceTotals, messageBuilder) {
+  // Crit bonus is + 2 successes for each PAIR of crits.
+  // Thus 2 crits is + 2 successs, 3 crits is + 2 successes.
+  let critScore = diceTotals.critScore + diceTotals.muddyCritScore;
+  let critBonus = Math.floor(critScore / 2) * 2;
+  let score = diceTotals.successScore + critBonus;
+  messageBuilder.addSection(`Successes=${score}`);
 
+  if (vtmGlobal.luckydice) messageBuilder.addBanner('Fate', 'LAST_RESORT');
+  if (!diceTotals.successScore) messageBuilder.addBanner('Fate', 'MISS_FAIL');
 
-  if (diceTotals.successScore === 0 && vtmGlobal.luckydice) {
-    let lastResort = '<img src="https://i.imgur.com/4XbkQua.png" title="Miss" height="20" width="228"/>';
-    outputMessage += "{{Fate=" + lastResort + endTemplateSection;
-    let miss = '<img src="https://raw.githubusercontent.com/Roll20/roll20-character-sheets/master/vampire-v5/Banners/MissFail.png" title="Miss" height="20" width="228"/>';
-    outputMessage += "{{Miss=" + miss + endTemplateSection;
-  } else if (diceTotals.successScore === 0) {
-    //outputMessage += "{{Fate=" + "Total failure" + endTemplateSection;
-    let miss = '<img src="https://raw.githubusercontent.com/Roll20/roll20-character-sheets/master/vampire-v5/Banners/MissFail.png" title="Miss" height="20" width="228"/>';
-    outputMessage += "{{Miss=" + miss + endTemplateSection;
-  } else if (vtmGlobal.luckydice) {
-    let lastResort = '<img src="https://i.imgur.com/4XbkQua.png" title="Miss" height="20" width="228"/>';
-    outputMessage += "{{Fate=" + lastResort + endTemplateSection;
-  }
-
-  if ((diceTotals.muddyCritScore >= 2) || (diceTotals.muddyCritScore === 1 && (diceTotals.critScore >= 1))) {
-    let messy = '<img src="https://i.imgur.com/KZTTwlE.png" title="Messy" height="20" width="228"/>';
-    outputMessage += "{{Messy=" + messy + endTemplateSection;
+  let isMuddy = diceTotals.muddyCritScore === 1 && (diceTotals.critScore >= 1);
+  isMuddy = isMuddy || diceTotals.muddyCritScore >= 2;
+  if (isMuddy) {
+    messageBuilder.addBanner('Messy', 'MESSY');
   } else if (diceTotals.critScore >= 2) {
-    let crit = '<img src="https://i.imgur.com/XNA64u9.png" title="Crit" height="20" width="228"/>';
-    outputMessage += "{{Crit=" + crit + endTemplateSection;
+    messageBuilder.addBanner('Crit', 'CRIT');
   }
 
-  if (diceTotals.failScore >= 5) {
-    outputMessage += "{{Beast=" + thebeast + endTemplateSection;
-    //  outputMessage += "{{BeastTaunt=" + "I do say dear boy, I may be a mite bit peckish." + endTemplateSection;
-  } else if (diceTotals.failScore >= 3) {
-    outputMessage += "{{Beast=" + thebeast + endTemplateSection;
-    //  outputMessage += "{{BeastTaunt=" + "BLOOD BLOOD GIVE ME BLOOD!! I MUST FEED!" + endTemplateSection;
-  } else if (diceTotals.failScore >= 2) {
-    outputMessage += "{{Beast=" + thebeast + endTemplateSection;
-    //  outputMessage += "{{BeastTaunt=" + "Let the vitae flow!" + endTemplateSection;
-  } else if (diceTotals.failScore >= 1) {
-    outputMessage += "{{Beast=" + thebeast + endTemplateSection;
-    //  outputMessage += "{{BeastTaunt=" + "Feed Me! (Hunger causes you to be distracted)" + endTemplateSection;
+  if (diceTotals.failScore >= 1) messageBuilder.addBanner('Beast', 'BEAST');
+}
+
+function createMessageBuilder() {
+  let message = "&{template:wod} ";
+
+  function getMessage() {
+    return message;
+  }
+  function addSection(content) {
+    message += `{{${content}}} `;
+  }
+  function addBanner(name, key) {
+    let banner = bannerImage(key);
+    addSection(`${name}=${banner}`);
   }
 
-  return outputMessage;
+  return {
+    getMessage,
+    addSection,
+    addBanner,
+  };
+}
+
+function bannerImage(banner) {
+  let image = vtmCONSTANTS.IMG.BANNERS[banner];
+  let src = image.URL;
+  let title = image.TITLE;
+  return `<img src="${src}" title="${title}" height="20" width="228"/>`;
 }
 
 function handleSkillRoll(input) {
@@ -664,6 +707,8 @@ if (typeof on !== 'undefined') {
   on("chat:message", roll20ApiHandler);
 } else {
   module.exports = {
+    vtmCONSTANTS,
+    vtmGlobal,
     rolls: {
       handleSkillRoll,
       handleWillpowerRoll,
