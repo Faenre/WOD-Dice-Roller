@@ -119,6 +119,18 @@ const vtmGlobal = {
   reroll: ""
 };
 
+const DicePoolConfigs = {
+    atr:      handleSkillRoll,
+    frenzy:   handleFrenzyRoll,
+    humanity: handleHumanityRoll,
+    remorse:  handleRemorseRoll,
+    rouse:    handleRouseRoll,
+    simple:   handleSimpleRoll,
+    skill:    handleSkillRoll,
+    will:     handleWillpowerRoll,
+    reroll:   handleWillpowerRoll,
+  };
+
 // roll20 api handler
 function roll20ApiHandler(msg) {
   // returns the chat window command entered, all in lowercase.
@@ -283,18 +295,11 @@ function parseCommandLineVariables(argv, who) {
 }
 
 // Decides how to distribute dice based on the type of roll
+/**
+ * @TODO: Replace this with a simple lookup
+ */
 function calculateRunScript(input) {
-  return {
-    atr:      handleSkillRoll,
-    frenzy:   handleFrenzyRoll,
-    humanity: handleHumanityRoll,
-    remorse:  handleRemorseRoll,
-    rouse:    handleRouseRoll,
-    simple:   handleSimpleRoll,
-    skill:    handleSkillRoll,
-    will:     handleWillpowerRoll,
-    reroll:   handleWillpowerRoll,
-  }[input.type](input);
+  return DicePoolConfigs[input.type](input);
 }
 
 function vtmRollDiceSuperFunc(dicePool) {
@@ -464,11 +469,15 @@ function rollVTMDice(diceQty, type) {
 
 /**
  * Get the image associated with the roll.
- * @param {*} type The type (V) Vampire or (H) Hunger.
+ *
+ * @TODO move this into the dice struct or somewhere else
+ *
+ * @param {*} type The type (v) Vampire or (h) Hunger.
  * @param {*} roll The roll value. Returns null if not 1 - 10
+ * @return image URL for a die image
  */
 function getDiceImage(type, roll) {
-  let imgPool = vtmCONSTANTS.IMG.DICE[(type === 'v') ? 'NORMAL' : 'MESSY'];
+  let imgPool = vtmCONSTANTS.IMG.DICE[{'v': 'NORMAL', 'h' : 'MESSY'}[type]];
   return imgPool[roll];
 }
 
