@@ -293,6 +293,7 @@ function calculateRunScript(input) {
     simple:   handleSimpleRoll,
     skill:    handleSkillRoll,
     will:     handleWillpowerRoll,
+    reroll:   handleWillpowerRoll,
   }[input.type](input);
 }
 
