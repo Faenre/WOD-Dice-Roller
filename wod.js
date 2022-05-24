@@ -678,7 +678,7 @@ function WodRoll (args, allowLucky = false) {
   }
 
   let black = new DicePool('NORMAL', Math.max(0, total - redDice));
-  let red = new DicePool('HUNGER', redDice);
+  let red = new DicePool('MESSY', redDice);
 
   this.blackDice = black.count;
   this.redDice = red.count;
