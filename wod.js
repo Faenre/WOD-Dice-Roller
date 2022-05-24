@@ -120,16 +120,16 @@ const vtmGlobal = {
 };
 
 const DicePoolConfigs = {
-    atr:      handleSkillRoll,
-    frenzy:   handleFrenzyRoll,
-    humanity: handleHumanityRoll,
-    remorse:  handleRemorseRoll,
-    rouse:    handleRouseRoll,
-    simple:   handleSimpleRoll,
-    skill:    handleSkillRoll,
-    will:     handleWillpowerRoll,
-    reroll:   handleWillpowerRoll,
-  };
+  atr:      handleSkillRoll,
+  frenzy:   handleFrenzyRoll,
+  humanity: handleHumanityRoll,
+  remorse:  handleRemorseRoll,
+  rouse:    handleRouseRoll,
+  simple:   handleSimpleRoll,
+  skill:    handleSkillRoll,
+  will:     handleWillpowerRoll,
+  reroll:   handleWillpowerRoll,
+};
 
 // roll20 api handler
 function roll20ApiHandler(msg) {
@@ -477,7 +477,7 @@ function rollVTMDice(diceQty, type) {
  * @return image URL for a die image
  */
 function getDiceImage(type, roll) {
-  let imgPool = vtmCONSTANTS.IMG.DICE[{'v': 'NORMAL', 'h' : 'MESSY'}[type]];
+  let imgPool = vtmCONSTANTS.IMG.DICE[{v: 'NORMAL', h : 'MESSY'}[type]];
   return imgPool[roll];
 }
 
@@ -602,24 +602,25 @@ function scaleMultiboxValue(value, scaleNumber) {
  * or to enable dice logging on one line or multiple.
  */
 function setLogging(value) {
+  const setChatLogging = (key) => {
+    vtmGlobal.diceLogChat = {
+      on: true,
+      off: false
+    }[key];
+  };
+  const setSingleLineRollLogging = (key) => {
+    vtmGlobal.diceLogRolledOnOneLine = {
+      single: true,
+      multi: false
+    }[key];
+  };
+
   return {
     on: setChatLogging,
     off: setChatLogging,
     single: setSingleLineRollLogging,
     multi: setSingleLineRollLogging,
   }[value](value);
-}
-function setChatLogging(key) {
-  vtmGlobal.diceLogChat = {
-    on: true,
-    off: false
-  }[key];
-}
-function setSingleLineRollLogging(key) {
-  vtmGlobal.diceLogRolledOnOneLine = {
-    single: true,
-    multi: false
-  }[key];
 }
 
 /**
@@ -641,10 +642,7 @@ function setGraphics(value) {
   }[value](value);
 }
 function setGraphicsEnabled(key) {
-  vtmGlobal.diceGraphicsChat = {
-    on: true,
-    off: false
-  }[key];
+  vtmGlobal.diceGraphicsChat = (key === 'on');
 }
 function setGraphicSize(key) {
   vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE[{
@@ -719,10 +717,17 @@ function DicePool (type, count) {
  * @returns {object} with value and image attributes
  */
 function Die (type) {
-  const imgSet = vtmCONSTANTS.IMG.DICE[type];
+  function getImage() {
+    return `<img \
+    src="${vtmCONSTANTS.IMG.DICE[type][this.value]}" \
+    title="${this.value}" \
+    height="${vtmGlobal.diceGraphicsChatSize}" \
+    width="${vtmGlobal.diceGraphicsChatSize}" \
+    />`;
+  }
 
   this.value = Math.floor(Math.random() * 10) + 1;
-  this.image = imgSet[this.value];
+  this.image = getImage();
 }
 
 // Allows this script to run in local node instances
