@@ -2,13 +2,13 @@ var log = log || ((...args) => console.log(...args));
 var sendChat = sendChat || log;
 var on = on || false;
 
-const vtmCONSTANTS = {
+const wodCONSTANTS = {
   VTMCOMMAND: "!vtm",
   ROLLS: new Set([
     'skill', 'atr', 'will', 'roll', 'rouse', 'reroll',
     'frenzy', 'remorse', 'humanity'
   ]),
-  DEBUG: new Set(['log', 'graphics', 'test']),
+  CONFIG: new Set(['log', 'graphics']),
   GRAPHICSIZE: {
     SMALL: 20,
     MEDIUM: 30,
@@ -111,10 +111,10 @@ const vtmCONSTANTS = {
   },
 };
 
-const vtmGlobal = {
+const wodGlobal = {
   diceLogChat: true,
   diceGraphicsChat: true,
-  diceGraphicsChatSize: vtmCONSTANTS.GRAPHICSIZE.XLARGE,
+  diceGraphicsChatSize: wodCONSTANTS.GRAPHICSIZE.XLARGE,
   diceTextResult: "",
   diceTextResultLog: "",
   diceGraphicResult: "",
@@ -123,7 +123,7 @@ const vtmGlobal = {
   reroll: ""
 };
 
-const DicePoolConfigs = {
+const ROLLTYPES = {
   atr:      handleSkillRoll,
   frenzy:   handleFrenzyRoll,
   humanity: handleHumanityRoll,
@@ -148,10 +148,10 @@ function roll20ApiHandler(msg) {
   log(argv);
 
   try {
-    if (vtmCONSTANTS.ROLLS.has(argv[1])) {
+    if (wodCONSTANTS.ROLLS.has(argv[1])) {
       processVampireDiceScript(argv, msg.who);
-    } else if (vtmCONSTANTS.DEBUG.has(argv[1])) {
-      processDebugScript(argv);
+    } else if (wodCONSTANTS.CONFIG.has(argv[1])) {
+      processConfigScript(argv);
     }
   } catch (err) {
     sendChat("Error", "Invalid input " + err);
@@ -174,7 +174,7 @@ function performInlineRolls(msg) {
 }
 
 function formatCommandLineArguments(chatCommand) {
-  vtmGlobal.reroll = chatCommand
+  wodGlobal.reroll = chatCommand
     .replace(/"/g, '&quot;')
     .replace(/~/g, '&#126;');
 
@@ -187,7 +187,7 @@ function formatCommandLineArguments(chatCommand) {
   return argv;
 }
 
-function processDebugScript(argv) {
+function processConfigScript(argv) {
   // this will run the various other scripts depending upon the chat
   // window command.  Just add another Case statement to add a new command.
   return {
@@ -198,11 +198,13 @@ function processDebugScript(argv) {
 
 function processVampireDiceScript(argv, who) {
   let input = parseCommandLineVariables(argv, who);
-  let dicePool = calculateRunScript(input);
-  dicePool.user = input.user;
-  dicePool.rollname = input.rollname;
 
-  let message = vtmRollDiceSuperFunc(dicePool);
+  let wodRoll = calculateRunScript(input);
+  wodRoll.user = input.user;
+  wodRoll.rollname = input.rollname;
+  log(wodRoll);
+
+  let message = vtmRollDiceSuperFunc(wodRoll);
   sendChat(input.user, message);
 }
 
@@ -299,68 +301,51 @@ function parseCommandLineVariables(argv, who) {
   return args;
 }
 
-// Decides how to distribute dice based on the type of roll
 /**
  * @TODO: Replace this with a simple lookup
  */
 function calculateRunScript(input) {
-  return DicePoolConfigs[input.type](input);
+  return ROLLTYPES[input.type](input);
 }
 
 function vtmRollDiceSuperFunc(wodRoll) {
-  log("Roll Variables");
-  log(wodRoll);
-
-  let blackDice = wodRoll.black;
-  let redDice = wodRoll.red;
-
-  let diceTotals = {};
-  for (let key of ['count', 'crits', 'successes', 'nils', 'botches']) {
-    diceTotals[key] = blackDice[key] + redDice[key];
-  }
-
-  wodRoll.flags.crit = (diceTotals.crits >= 2);
-  wodRoll.flags.messy = wodRoll.flags.crit && redDice.crits;
-
-  let score = diceTotals.successes + Math.floor(diceTotals.crits / 2);
-
   let messageBuilder = createMessageBuilder();
   messageBuilder.addSection(`name=${wodRoll.user}`);
 
   if (wodRoll.rollname) messageBuilder.addSection(`Rollname=${wodRoll.rollname}`);
 
-  if (vtmGlobal.diceLogChat === true) {
-    if (vtmGlobal.diceLogRolledOnOneLine === true) {
-      if (vtmGlobal.diceGraphicsChat === true) {
-        messageBuilder.addSection(`Roll=${diceTotals.graphics}`);
+  if (wodGlobal.diceLogChat === true) {
+    if (wodGlobal.diceLogRolledOnOneLine === true) {
+      if (wodGlobal.diceGraphicsChat === true) {
+        messageBuilder.addSection(`Roll=${wodRoll.totals.graphics}`);
       } else {
-        messageBuilder.addSection(`Roll=${diceTotals.text}`);
+        messageBuilder.addSection(`Roll=${wodRoll.totals.text}`);
       }
-    } else if (vtmGlobal.diceGraphicsChat === true) {
-      messageBuilder.addSection(`Normal=${blackDice.graphics}`);
-      messageBuilder.addSection(`Hunger=${redDice.graphics}`);
+    } else if (wodGlobal.diceGraphicsChat === true) {
+      messageBuilder.addSection(`Normal=${wodRoll.black.graphics}`);
+      messageBuilder.addSection(`Hunger=${wodRoll.red.graphics}`);
     } else {
-      messageBuilder.addSection(`Normal=${blackDice.text}`);
-      messageBuilder.addSection(`Hunger=${redDice.text}`);
+      messageBuilder.addSection(`Normal=${wodRoll.black.text}`);
+      messageBuilder.addSection(`Hunger=${wodRoll.red.text}`);
     }
   }
 
-  messageBuilder.addSection(`Successes=${score}`);
+  messageBuilder.addSection(`Successes=${wodRoll.score}`);
 
   if (wodRoll.flags.rouse) {
-    if (diceTotals.successes) {
+    if (wodRoll.score) {
       messageBuilder.addBanner('HUNGER_GAIN');
     } else {
       messageBuilder.addBanner('HUNGER_NO_GAIN');
     }
   } else if (wodRoll.flags.frenzy) {
-    if (diceTotals.successes) {
+    if (wodRoll.score > wodRoll.difficulty) {
       messageBuilder.addBanner('FRENZY_RESIST');
     } else {
       messageBuilder.addBanner('FRENZY');
     }
   } else if (wodRoll.flags.remorse) {
-    if (diceTotals.successes) {
+    if (wodRoll.score) {
       messageBuilder.addBanner('REMORSE_PASS');
     } else {
       messageBuilder.addBanner('REMORSE_FAIL');
@@ -371,7 +356,7 @@ function vtmRollDiceSuperFunc(wodRoll) {
     messageBuilder.addBanner('LAST_RESORT');
   }
 
-  if (!diceTotals.successes) {
+  if (!wodRoll.totals.successes) {
     messageBuilder.addBanner('MISS_FAIL');
   }
 
@@ -381,7 +366,7 @@ function vtmRollDiceSuperFunc(wodRoll) {
     messageBuilder.addBanner('CRIT');
   }
 
-  if (diceTotals.failScore >= 1) {
+  if (wodRoll.red.botches) {
     messageBuilder.addBanner('BEAST');
   }
 
@@ -390,18 +375,16 @@ function vtmRollDiceSuperFunc(wodRoll) {
 
   return messageBuilder.getMessage();
 }
-
 function createMessageBuilder() {
   let message = "&{template:wod} ";
 
-  function getMessage() {
-    return message;
-  }
   function addSection(content) {
     message += `{{${content}}} `;
   }
   function addBanner(key) {
-    let banner = vtmCONSTANTS.IMG.BANNERS[key];
+    if (!key) return;
+
+    let banner = wodCONSTANTS.IMG.BANNERS[key];
     let img = `<img height="20" width="228" \
     src="${banner.URL}" title="${banner.TITLE}" />`;
 
@@ -409,20 +392,19 @@ function createMessageBuilder() {
   }
 
   return {
-    getMessage,
+    getMessage: () => message,
     addSection,
     addBanner,
   };
 }
 
+
 function handleSkillRoll(input) {
   return new WodRoll(input, true);
 }
-
 function handleWillpowerRoll(input) {
   return new WodRoll(input, true);
 }
-
 function handleRouseRoll(input) {
   let args = {hunger: Math.max(1, input.modifier || 0)};
   let pool = new WodRoll(args);
@@ -430,32 +412,29 @@ function handleRouseRoll(input) {
 
   return pool;
 }
-
 function handleFrenzyRoll(input) {
   let pool = new WodRoll(input, true);
   pool.flags.frenzy = true;
-  pool.difficulty = input.difficulty;
+  pool.difficulty = input.difficulty || 2;
 
   return pool;
 }
-
 function handleSimpleRoll(input) {
   let args = Object.create(input);
   args.modifier = (args.modifier || 0) + (args.hunger || 0);
 
   return new WodRoll(args, false);
 }
-
 function handleRemorseRoll(input) {
   let pool = new WodRoll(input, true);
   pool.flags.remorse = true;
 
   return pool;
 }
-
 function handleHumanityRoll(input) {
   return new WodRoll(input, true);
 }
+
 
 // Used for multistate checkboxes
 function updateMultiboxValue(value) {
@@ -464,19 +443,18 @@ function updateMultiboxValue(value) {
   value = scaleMultiboxValue(value, 16);
   return value;
 }
-
 // Used for multistate checkboxes
 function updateMultiboxValue1(value) {
   value = scaleMultiboxValue(value, 3616);
   value = scaleMultiboxValue(value, 241);
   return value;
 }
-
 function scaleMultiboxValue(value, scaleNumber) {
   while (value > scaleNumber) value -= scaleNumber;
 
   return value;
 }
+
 
 /**
  * Adjusts the output logging.
@@ -488,13 +466,13 @@ function scaleMultiboxValue(value, scaleNumber) {
  */
 function setLogging(value) {
   const setChatLogging = (key) => {
-    vtmGlobal.diceLogChat = {
+    wodGlobal.diceLogChat = {
       on: true,
       off: false
     }[key];
   };
   const setSingleLineRollLogging = (key) => {
-    vtmGlobal.diceLogRolledOnOneLine = {
+    wodGlobal.diceLogRolledOnOneLine = {
       single: true,
       multi: false
     }[key];
@@ -527,10 +505,10 @@ function setGraphics(value) {
   }[value](value);
 }
 function setGraphicsEnabled(key) {
-  vtmGlobal.diceGraphicsChat = (key === 'on');
+  wodGlobal.diceGraphicsChat = (key === 'on');
 }
 function setGraphicSize(key) {
-  vtmGlobal.diceGraphicsChatSize = vtmCONSTANTS.GRAPHICSIZE[{
+  wodGlobal.diceGraphicsChatSize = wodCONSTANTS.GRAPHICSIZE[{
     s:  'SMALL',
     m:  'MEDIUM',
     l:  'LARGE',
@@ -538,6 +516,7 @@ function setGraphicSize(key) {
     xx: 'XXLARGE'
   }[key]];
 }
+
 
 /**
  * Represents a total pool of dice.
@@ -555,27 +534,43 @@ function setGraphicSize(key) {
 function WodRoll (args, allowLucky = false) {
   this.flags = {};
 
-  const allowableArgs = [
-    'attribute',
-    'skill',
-    'modifier',
-    'willpower',
-  ];
-  const sumDice = (dice, attr) => dice + args[attr];
+  let total = sumTotal(this, args, allowLucky);
 
-  let total = allowableArgs.reduce(sumDice, 0) || 0;
   let redCount = args.hunger || 0;
-
-  if (allowLucky && total <= 0) {
-    this.flags.lucky = true;
-    total = 1;
-  }
 
   this.black = new DicePool('NORMAL', Math.max(0, total - redCount));
   this.red = new DicePool('MESSY', redCount);
 
-  this.blackDice = this.black.count;
-  this.redDice = this.red.count;
+  let pools = [this.black, this.red];
+  this.totals = summarizeDice(this, pools);
+
+  this.score = this.totals.successes + Math.floor(this.totals.crits / 2) * 2;
+  this.flags.crit = (this.totals.crits >= 2);
+  this.flags.messy = this.flags.crit && (this.totals.crits > pools[0].crits);
+}
+function sumTotal(wr, args, allowLucky) {
+  let total  = 0;
+
+  for (let key of ['attribute', 'skill', 'modifier', 'willpower']) {
+    total += args[key] || 0;
+  }
+
+  if (allowLucky && total <= 0) {
+    wr.flags.lucky = true;
+    total = 1;
+  }
+
+  return total;
+}
+function summarizeDice(wr, pools) {
+  let diceTotals = {};
+
+  for (let pool of pools) {
+    for (let key of ['count', 'crits', 'successes', 'nils', 'botches']) {
+      diceTotals[key] = (diceTotals[key] || 0) + pool[key];
+    }
+  }
+  return diceTotals;
 }
 
 /**
@@ -594,7 +589,7 @@ function DicePool (type, count) {
   this.successes = dice.filter((die) => die.value >= 6).length;
   this.nils = dice.filter((die) => die.value > 1 && die.value <= 5).length;
   this.botches = dice.filter((die) => die.value === 1).length;
-  this.text = dice.map((die) => `(${die.value}`).join('');
+  this.text = dice.map((die) => `(${die.value})`).join('');
   this.graphics = dice.map((die) => die.image).join('');
 }
 
@@ -605,17 +600,18 @@ function DicePool (type, count) {
  * @returns {object} with value and image attributes
  */
 function Die (type) {
-  function getImage() {
+  function getImage(v) {
     return `<img \
-    src="${vtmCONSTANTS.IMG.DICE[type][this.value]}" \
-    title="${this.value}" \
-    height="${vtmGlobal.diceGraphicsChatSize}" \
-    width="${vtmGlobal.diceGraphicsChatSize}" \
+    src="${wodCONSTANTS.IMG.DICE[type][value]}" \
+    title="${value}" \
+    height="${wodGlobal.diceGraphicsChatSize}" \
+    width="${wodGlobal.diceGraphicsChatSize}" \
     />`;
   }
 
-  this.value = Math.floor(Math.random() * 10) + 1;
-  this.image = getImage();
+  let value = Math.floor(Math.random() * 10) + 1;
+  this.value = value;
+  this.image = getImage(value);
 }
 
 // Allows this script to run in local node instances
@@ -623,8 +619,8 @@ if (typeof on === 'function') {
   on("chat:message", roll20ApiHandler);
 } else {
   module.exports = {
-    vtmCONSTANTS,
-    vtmGlobal,
+    wodCONSTANTS,
+    wodGlobal,
     rolls: {
       handleSkillRoll,
       handleWillpowerRoll,

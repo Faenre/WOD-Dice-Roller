@@ -19,21 +19,21 @@ test('calculateRunScript returns a WodRoll', () => {
 
 test('handleSkillRoll handles base case', () => {
   let pool = wod.rolls.handleSkillRoll(args);
-  expect(pool.blackDice).toBe(3);
-  expect(pool.redDice).toBe(1);
+  expect(pool.black.count).toBe(3);
+  expect(pool.red.count).toBe(1);
 });
 
 test('handleWillpowerRoll handles base case', () => {
   let pool = wod.rolls.handleWillpowerRoll(args);
-  expect(pool.blackDice).toBe(3);
-  expect(pool.redDice).toBe(1);
+  expect(pool.black.count).toBe(3);
+  expect(pool.red.count).toBe(1);
 });
 
 test('handleRouseRoll handles base case', () => {
   let pool = wod.rolls.handleRouseRoll({});
 
-  expect(pool.blackDice).toBe(0);
-  expect(pool.redDice).toBe(1);
+  expect(pool.black.count).toBe(0);
+  expect(pool.red.count).toBe(1);
   expect(pool.flags.rouse).toBe(true);
 });
 test('handleRouseRoll accepts modifier argument', () => {
@@ -41,35 +41,35 @@ test('handleRouseRoll accepts modifier argument', () => {
   args2.modifier = 10;
   let pool = wod.rolls.handleRouseRoll(args2);
 
-  expect(pool.blackDice).toBe(0);
-  expect(pool.redDice).toBe(10);
+  expect(pool.black.count).toBe(0);
+  expect(pool.red.count).toBe(10);
   expect(pool.flags.rouse).toBe(true);
 });
 
 test('handleSimpleRoll doesnt subtract hunger from total', () => {
   let pool = wod.rolls.handleSimpleRoll(args);
-  expect(pool.blackDice).toBe(4);
-  expect(pool.redDice).toBe(1);
+  expect(pool.black.count).toBe(4);
+  expect(pool.red.count).toBe(1);
 });
 
 test('handleFrenzyRoll handles base case', () => {
   let pool = wod.rolls.handleFrenzyRoll(args);
-  expect(pool.blackDice).toBe(3);
-  expect(pool.redDice).toBe(1);
+  expect(pool.black.count).toBe(3);
+  expect(pool.red.count).toBe(1);
   expect(pool.flags.frenzy).toBe(true);
 });
 
 test('handleRemorseRoll handles base case', () => {
   let pool = wod.rolls.handleRemorseRoll(args);
-  expect(pool.blackDice).toBe(3);
-  expect(pool.redDice).toBe(1);
+  expect(pool.black.count).toBe(3);
+  expect(pool.red.count).toBe(1);
   expect(pool.flags.remorse).toBe(true);
 });
 
 test('handleHumanityRoll handles base case', () => {
   let pool = wod.rolls.handleHumanityRoll(args);
-  expect(pool.blackDice).toBe(3);
-  expect(pool.redDice).toBe(1);
+  expect(pool.black.count).toBe(3);
+  expect(pool.red.count).toBe(1);
 });
 
 test('createMessageBuilder generates valid template outputs', () => {
@@ -93,7 +93,7 @@ test('createMessageBuilder generates valid template outputs', () => {
 });
 
 test('setGraphics correctly toggles graphics', () => {
-  const globals = wod.vtmGlobal;
+  const globals = wod.wodGlobal;
 
   wod.setGraphics('on');
   expect(globals.diceGraphicsChat).toBe(true);
@@ -102,8 +102,8 @@ test('setGraphics correctly toggles graphics', () => {
 });
 
 test('setGraphics correctly sets graphic sizes', () => {
-  const globals = wod.vtmGlobal;
-  const constants = wod.vtmCONSTANTS;
+  const globals = wod.wodGlobal;
+  const constants = wod.wodCONSTANTS;
 
   wod.setGraphics('s');
   expect(globals.diceGraphicsChatSize).toBe(constants.GRAPHICSIZE.SMALL);
@@ -112,7 +112,7 @@ test('setGraphics correctly sets graphic sizes', () => {
 });
 
 test('setLogging correctly toggles globals', () => {
-  const globals = wod.vtmGlobal;
+  const globals = wod.wodGlobal;
 
   wod.setLogging('on');
   expect(globals.diceLogChat).toBe(true);
