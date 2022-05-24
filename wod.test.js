@@ -72,14 +72,6 @@ test('handleHumanityRoll handles base case', () => {
   expect(pool.redDice).toBe(1);
 });
 
-test('getDiceImage returns image URLs from correct sets', () => {
-  let blackCritImg = wod.vtmCONSTANTS.IMG.DICE.NORMAL[10];
-  expect(wod.getDiceImage('v', 10)).toBe(blackCritImg);
-
-  let redBotchImg = wod.vtmCONSTANTS.IMG.DICE.MESSY[1];
-  expect(wod.getDiceImage('h', 1)).toBe(redBotchImg);
-});
-
 test('createMessageBuilder generates valid template outputs', () => {
   let builder = wod.createMessageBuilder();
   function matchingBrackets(msg) {
@@ -95,7 +87,7 @@ test('createMessageBuilder generates valid template outputs', () => {
 
   builder.addSection('Normal', "<img src=''>");
   builder.addSection('Hunger', "<img src=''>");
-  builder.addBanner('Miss', 'MISS_FAIL');
+  builder.addBanner('MISS_FAIL');
   expect(builder.getMessage().endsWith(' ')).toBe(true);
   expect(matchingBrackets(builder.getMessage())).toBe(true);
 });

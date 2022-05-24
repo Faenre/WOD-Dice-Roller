@@ -55,56 +55,60 @@ const vtmCONSTANTS = {
       BEAST: {
         URL: 'https://i.imgur.com/6N0Ld40.png',
         TITLE: 'The Beast',
+        SECTION: 'Beast',
       },
       HUNGER_GAIN: {
         URL: 'https://i.imgur.com/UV57YLP.png',
         TITLE: 'Hunger Gain',
+        SECTION: 'Beast',
       },
       HUNGER_NO_GAIN: {
         URL: 'https://i.imgur.com/b3NHCNk.png',
         TITLE: 'Rousing Success',
+        SECTION: 'Beast',
       },
       FRENZY_RESIST: {
         URL: 'https://raw.githubusercontent.com/Roll20/roll20-character-sheets/master/vampire-v5/Banners/FrenzyRestrained.png',
         TITLE: 'Frenzy Restrained',
+        SECTION: 'Beast',
       },
       FRENZY: {
         URL: 'https://raw.githubusercontent.com/Roll20/roll20-character-sheets/master/vampire-v5/Banners/Frenzy.png',
         TITLE: 'Frenzy',
+        SECTION: 'Beast',
       },
       REMORSE_PASS: {
         URL: 'https://i.imgur.com/zubTvLd.png',
         TITLE: 'Guilty',
+        SECTION: 'Beast',
       },
       REMORSE_FAIL: {
         URL: 'https://i.imgur.com/21qrGX5.png',
         TITLE: 'Innocent',
+        SECTION: 'Beast',
       },
       LAST_RESORT: {
         URL: 'https://i.imgur.com/4XbkQua.png',
         TITLE: 'Last Resort',
+        SECTION: 'Fate',
       },
       MISS_FAIL: {
         URL: 'https://raw.githubusercontent.com/Roll20/roll20-character-sheets/master/vampire-v5/Banners/MissFail.png',
         TITLE: 'Miss',
+        SECTION: 'Fate',
       },
       MESSY: {
         URL: 'https://i.imgur.com/KZTTwlE.png',
         TITLE: 'Messy',
+        SECTION: 'Messy',
       },
       CRIT: {
         URL: 'https://i.imgur.com/XNA64u9.png',
         TITLE: 'Crit',
+        SECTION: 'Crit',
       }
     }
   },
-  BASEDC:{
-    // These DCs are set to be equal to or greater than their listed value
-    critFail: 1,
-    nil: 2,
-    success: 6,
-    critSuccess: 10
-  }
 };
 
 const vtmGlobal = {
@@ -198,7 +202,8 @@ function processVampireDiceScript(argv, who) {
   dicePool.user = input.user;
   dicePool.rollname = input.rollname;
 
-  vtmRollDiceSuperFunc(dicePool);
+  let message = vtmRollDiceSuperFunc(dicePool);
+  sendChat(input.user, message);
 }
 
 function parseCommandLineVariables(argv, who) {
@@ -302,204 +307,88 @@ function calculateRunScript(input) {
   return DicePoolConfigs[input.type](input);
 }
 
-function vtmRollDiceSuperFunc(dicePool) {
-  var attackDiceResults = {
-    nilScore: 0,
-    successScore: 0,
-    critScore: 0,
-    muddyCritScore: 0,
-    failScore: 0,
-    diceGraphicsLog: "",
-    diceTextLog: ""
-  };
-  var defendDiceResults = {
-    nilScore: 0,
-    successScore: 0,
-    critScore: 0,
-    muddyCritScore: 0,
-    failScore: 0,
-    diceGraphicsLog: "",
-    diceTextLog: "",
-    hungerSustained: true
-  };
-
-  var diceTextRolled = "";
-  var diceGraphicsRolled = "";
-
+function vtmRollDiceSuperFunc(wodRoll) {
   log("Roll Variables");
-  log(dicePool);
-  let user = dicePool.user;
+  log(wodRoll);
 
-  attackDiceResults = rollVTMDice(dicePool.blackDice, "v");
-  defendDiceResults = rollVTMDice(dicePool.redDice, "h");
+  let blackDice = wodRoll.black;
+  let redDice = wodRoll.red;
 
-  log(attackDiceResults);
-  log(defendDiceResults);
+  let diceTotals = {};
+  for (let key of ['count', 'crits', 'successes', 'nils', 'botches']) {
+    diceTotals[key] = blackDice[key] + redDice[key];
+  }
 
-  let diceTotals = {
-    nilScore: attackDiceResults.nilScore + defendDiceResults.nilScore,
-    successScore: attackDiceResults.successScore + defendDiceResults.successScore,
-    critScore: attackDiceResults.critScore + defendDiceResults.critScore,
-    muddyCritScore: attackDiceResults.muddyCritScore + defendDiceResults.muddyCritScore,
-    failScore: attackDiceResults.failScore + defendDiceResults.failScore,
-    diceGraphicsLog: attackDiceResults.diceGraphicsLog + defendDiceResults.diceGraphicsLog,
-    diceTextLog: "Normal" + attackDiceResults.diceTextLog + "Hunger" + defendDiceResults.diceTextLog
-  };
+  wodRoll.flags.crit = (diceTotals.crits >= 2);
+  wodRoll.flags.messy = wodRoll.flags.crit && redDice.crits;
+
+  let score = diceTotals.successes + Math.floor(diceTotals.crits / 2);
 
   let messageBuilder = createMessageBuilder();
-  messageBuilder.addSection(`name=${user}`);
+  messageBuilder.addSection(`name=${wodRoll.user}`);
 
-  if (dicePool.rollname) messageBuilder.addSection(`Rollname=${dicePool.rollname}`);
+  if (wodRoll.rollname) messageBuilder.addSection(`Rollname=${wodRoll.rollname}`);
 
   if (vtmGlobal.diceLogChat === true) {
     if (vtmGlobal.diceLogRolledOnOneLine === true) {
-      diceGraphicsRolled = diceTotals.diceGraphicsLog;
-      diceTextRolled = diceTotals.diceTextLog;
       if (vtmGlobal.diceGraphicsChat === true) {
-        messageBuilder.addSection(`Roll=${diceGraphicsRolled}`);
+        messageBuilder.addSection(`Roll=${diceTotals.graphics}`);
       } else {
-        messageBuilder.addSection(`Roll=${diceTextRolled}`);
+        messageBuilder.addSection(`Roll=${diceTotals.text}`);
       }
     } else if (vtmGlobal.diceGraphicsChat === true) {
-      messageBuilder.addSection(`Normal=${attackDiceResults.diceGraphicsLog}`);
-      messageBuilder.addSection(`Hunger=${defendDiceResults.diceGraphicsLog}`);
+      messageBuilder.addSection(`Normal=${blackDice.graphics}`);
+      messageBuilder.addSection(`Hunger=${redDice.graphics}`);
     } else {
-      messageBuilder.addSection(`Normal=${attackDiceResults.diceTextLog}`);
-      messageBuilder.addSection(`Hunger=${defendDiceResults.diceTextLog}`);
+      messageBuilder.addSection(`Normal=${blackDice.text}`);
+      messageBuilder.addSection(`Hunger=${redDice.text}`);
     }
   }
 
-  if (dicePool.flags.rouse) {
-    let critScore = diceTotals.critScore + diceTotals.muddyCritScore;
-    let critBonus = Math.floor(critScore / 2) * 2;
-    let score = diceTotals.successScore + critBonus;
+  messageBuilder.addSection(`Successes=${score}`);
 
-    messageBuilder.addSection(`Successes=${score}`);
-    if (diceTotals.successScore > 0) {
-      messageBuilder.addBanner('Beast', 'HUNGER_GAIN');
+  if (wodRoll.flags.rouse) {
+    if (diceTotals.successes) {
+      messageBuilder.addBanner('HUNGER_GAIN');
     } else {
-      messageBuilder.addBanner('Beast', 'HUNGER_NO_GAIN');
+      messageBuilder.addBanner('HUNGER_NO_GAIN');
     }
-  } else if (dicePool.flags.frenzy) {
-    messageBuilder.addSection(`Successes=${diceTotals.successScore}`);
-    if (diceTotals.successScore >= dicePool.difficulty) {
-      messageBuilder.addBanner('Beast', 'FRENZY_RESIST');
+  } else if (wodRoll.flags.frenzy) {
+    if (diceTotals.successes) {
+      messageBuilder.addBanner('FRENZY_RESIST');
     } else {
-      messageBuilder.addBanner('Beast', 'FRENZY');
+      messageBuilder.addBanner('FRENZY');
     }
-  } else if (dicePool.flags.remorse) {
-    messageBuilder.addSection(`Successes=${diceTotals.successScore}`);
-    if (diceTotals.successScore > 0) {
-      messageBuilder.addBanner('Beast', 'REMORSE_PASS');
+  } else if (wodRoll.flags.remorse) {
+    if (diceTotals.successes) {
+      messageBuilder.addBanner('REMORSE_PASS');
     } else {
-      messageBuilder.addBanner('Beast', 'REMORSE_FAIL');
+      messageBuilder.addBanner('REMORSE_FAIL');
     }
-  } else {
-    addRollDeclarations(diceTotals, messageBuilder);
   }
 
-  if (dicePool.flags.lucky) {
-    messageBuilder.addBanner('Fate', 'LAST_RESORT');
+  if (wodRoll.flags.lucky) {
+    messageBuilder.addBanner('LAST_RESORT');
   }
-  messageBuilder.addSection(`Reroll=[Reroll](${vtmGlobal.reroll})`);
+
+  if (!diceTotals.successes) {
+    messageBuilder.addBanner('MISS_FAIL');
+  }
+
+  if (wodRoll.flags.messy) {
+    messageBuilder.addBanner('MESSY');
+  } else if (wodRoll.flags.crit) {
+    messageBuilder.addBanner('CRIT');
+  }
+
+  if (diceTotals.failScore >= 1) {
+    messageBuilder.addBanner('BEAST');
+  }
 
   log("Output");
   log(messageBuilder.getMessage());
 
-  sendChat(user, messageBuilder.getMessage());
-}
-
-function rollVTMDice(diceQty, type) {
-  const dc = vtmCONSTANTS.BASEDC;
-  const diceResult = {
-    nilScore: 0,
-    successScore: 0,
-    critScore: 0,
-    muddyCritScore: 0,
-    failScore: 0,
-    diceGraphicsLog: "",
-    diceTextLog: ""
-  };
-
-  // Used to build images
-  function imgUrlBuilder(image, roll) {
-    return `<img \
-    src="${image}" \
-    title="${roll}" \
-    height="${vtmGlobal.diceGraphicsChatSize}" \
-    width="${vtmGlobal.diceGraphicsChatSize}" \
-    />`;
-  }
-
-  for (let i = 1; i <= diceQty; i++) {
-    let roll = Math.floor(Math.random() * 10) + 1;
-
-    let image = getDiceImage(type, roll);
-    diceResult.diceTextLog += `(${roll})`;
-    diceResult.diceGraphicsLog += imgUrlBuilder(image, roll);
-
-    // TODO: break this away from nested IFs
-    if (type === "v") {
-      if (roll >= dc.critSuccess) {
-        diceResult.successScore += 1;
-        diceResult.critScore += 1;
-      } else if (roll >= dc.success) {
-        diceResult.successScore += 1;
-      } else if (roll >= dc.nil) {
-        diceResult.nilScore += 1;
-      } else if (roll >= dc.critFail) {
-        diceResult.nilScore += 1;
-      }
-    } else if (type === "h") {
-      if (roll >= dc.critSuccess) {
-        diceResult.successScore += 1;
-        diceResult.muddyCritScore += 1;
-      } else if (roll >= dc.success) {
-        diceResult.successScore += 1;
-      } else if (roll >= dc.nil) {
-        diceResult.nilScore += 1;
-      } else if (roll >= dc.critFail) {
-        diceResult.failScore += 1;
-      }
-    }
-  }
-
-  return diceResult;
-}
-
-/**
- * Get the image associated with the roll.
- *
- * @TODO move this into the dice struct or somewhere else
- *
- * @param {*} type The type (v) Vampire or (h) Hunger.
- * @param {*} roll The roll value. Returns null if not 1 - 10
- * @return image URL for a die image
- */
-function getDiceImage(type, roll) {
-  let imgPool = vtmCONSTANTS.IMG.DICE[{v: 'NORMAL', h : 'MESSY'}[type]];
-  return imgPool[roll];
-}
-
-function addRollDeclarations(diceTotals, messageBuilder) {
-  // Crit bonus is + 2 successes for each PAIR of crits.
-  // Thus 2 crits is + 2 successs, 3 crits is + 2 successes.
-  let critScore = diceTotals.critScore + diceTotals.muddyCritScore;
-  let critBonus = Math.floor(critScore / 2) * 2;
-  let score = diceTotals.successScore + critBonus;
-  messageBuilder.addSection(`Successes=${score}`);
-
-  if (!diceTotals.successScore) messageBuilder.addBanner('Fate', 'MISS_FAIL');
-
-  let isMuddy = diceTotals.muddyCritScore === 1 && (diceTotals.critScore >= 1);
-  isMuddy = isMuddy || diceTotals.muddyCritScore >= 2;
-  if (isMuddy) {
-    messageBuilder.addBanner('Messy', 'MESSY');
-  } else if (diceTotals.critScore >= 2) {
-    messageBuilder.addBanner('Crit', 'CRIT');
-  }
-
-  if (diceTotals.failScore >= 1) messageBuilder.addBanner('Beast', 'BEAST');
+  return messageBuilder.getMessage();
 }
 
 function createMessageBuilder() {
@@ -511,9 +400,12 @@ function createMessageBuilder() {
   function addSection(content) {
     message += `{{${content}}} `;
   }
-  function addBanner(name, key) {
-    let banner = bannerImage(key);
-    addSection(`${name}=${banner}`);
+  function addBanner(key) {
+    let banner = vtmCONSTANTS.IMG.BANNERS[key];
+    let img = `<img height="20" width="228" \
+    src="${banner.URL}" title="${banner.TITLE}" />`;
+
+    addSection(`${banner.SECTION}=${img}`);
   }
 
   return {
@@ -521,13 +413,6 @@ function createMessageBuilder() {
     addSection,
     addBanner,
   };
-}
-
-function bannerImage(banner) {
-  let image = vtmCONSTANTS.IMG.BANNERS[banner];
-  let src = image.URL;
-  let title = image.TITLE;
-  return `<img src="${src}" title="${title}" height="20" width="228"/>`;
 }
 
 function handleSkillRoll(input) {
@@ -669,6 +554,7 @@ function setGraphicSize(key) {
  */
 function WodRoll (args, allowLucky = false) {
   this.flags = {};
+
   const allowableArgs = [
     'attribute',
     'skill',
@@ -678,18 +564,18 @@ function WodRoll (args, allowLucky = false) {
   const sumDice = (dice, attr) => dice + args[attr];
 
   let total = allowableArgs.reduce(sumDice, 0) || 0;
-  let redDice = args.hunger || 0;
+  let redCount = args.hunger || 0;
 
-  if (total <= 0 && allowLucky) {
+  if (allowLucky && total <= 0) {
     this.flags.lucky = true;
     total = 1;
   }
 
-  let black = new DicePool('NORMAL', Math.max(0, total - redDice));
-  let red = new DicePool('MESSY', redDice);
+  this.black = new DicePool('NORMAL', Math.max(0, total - redCount));
+  this.red = new DicePool('MESSY', redCount);
 
-  this.blackDice = black.count;
-  this.redDice = red.count;
+  this.blackDice = this.black.count;
+  this.redDice = this.red.count;
 }
 
 /**
@@ -704,10 +590,12 @@ function DicePool (type, count) {
     .map(() => new Die(type));
 
   this.count = count;
-  this.successes = dice.filter((die) => die.value >= 6);
-  this.crits = dice.filter((die) => die.value === 10);
-  this.botches = dice.filter((die) => die.value === 1);
-  this.images = dice.map((die) => die.image).join('');
+  this.crits = dice.filter((die) => die.value === 10).length;
+  this.successes = dice.filter((die) => die.value >= 6).length;
+  this.nils = dice.filter((die) => die.value > 1 && die.value <= 5).length;
+  this.botches = dice.filter((die) => die.value === 1).length;
+  this.text = dice.map((die) => `(${die.value}`).join('');
+  this.graphics = dice.map((die) => die.image).join('');
 }
 
 /**
@@ -746,7 +634,6 @@ if (typeof on === 'function') {
       handleRemorseRoll,
       handleHumanityRoll,
     },
-    getDiceImage,
     calculateRunScript,
     createMessageBuilder,
     setGraphics,
