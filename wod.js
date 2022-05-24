@@ -188,8 +188,6 @@ function formatCommandLineArguments(chatCommand) {
 }
 
 function processConfigScript(argv) {
-  // this will run the various other scripts depending upon the chat
-  // window command.  Just add another Case statement to add a new command.
   return {
     log: setLogging,
     graphics: setGraphics,
