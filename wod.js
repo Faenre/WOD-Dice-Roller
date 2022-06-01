@@ -49,7 +49,23 @@ const wodCONSTANTS = {
         9:  "https://i.imgur.com/9FzRKxA.png",
         // crit:
         10: "https://i.imgur.com/xUhtSHU.png"
-      }
+      },
+      VAMPIRE: {
+        // botch:
+        1:  "https://i.imgur.com/BP4viSE.png",
+        // miss:
+        2:  "https://i.imgur.com/wXTSIoi.png",
+        3:  "https://i.imgur.com/wXTSIoi.png",
+        4:  "https://i.imgur.com/wXTSIoi.png",
+        5:  "https://i.imgur.com/wXTSIoi.png",
+        // success:
+        6:  "https://i.imgur.com/ceeQ22y.png",
+        7:  "https://i.imgur.com/ceeQ22y.png",
+        8:  "https://i.imgur.com/ceeQ22y.png",
+        9:  "https://i.imgur.com/ceeQ22y.png",
+        // crit:
+        10: "https://i.imgur.com/suBZU9i.png"
+      },
     },
     BANNERS: {
       BEAST: {
@@ -129,6 +145,7 @@ const ROLLTYPES = {
   humanity: handleHumanityRoll,
   remorse:  handleRemorseRoll,
   rouse:    handleRouseRoll,
+  roll:     handleSimpleRoll,
   simple:   handleSimpleRoll,
   skill:    handleSkillRoll,
   will:     handleWillpowerRoll,
@@ -197,13 +214,16 @@ function processConfigScript(argv) {
 function processVampireDiceScript(argv, who) {
   let input = parseCommandLineVariables(argv, who);
 
-  let wodRoll = calculateRunScript(input);
+  let wodRoll = createWodRoll(input);
   wodRoll.user = input.user;
   wodRoll.rollname = input.rollname;
   log(wodRoll);
 
-  let message = vtmRollDiceSuperFunc(wodRoll);
-  sendChat(input.user, message);
+  if (wodGlobal.diceLogChat) {
+    let message = convertRollToChatMessage(wodRoll);
+    log(message);
+    sendChat(input.user, message);
+  }
 }
 
 function parseCommandLineVariables(argv, who) {
@@ -302,74 +322,33 @@ function parseCommandLineVariables(argv, who) {
 /**
  * @TODO: Replace this with a simple lookup
  */
-function calculateRunScript(input) {
-  return ROLLTYPES[input.type](input);
+function createWodRoll(input) {
+  let script = ROLLTYPES[input.type] || handleSimpleRoll;
+
+  return script(input);
 }
 
-function vtmRollDiceSuperFunc(wodRoll) {
+/**
+ * Build the message that gets published to the chat
+ */
+function convertRollToChatMessage(wodRoll) {
   let messageBuilder = createMessageBuilder();
   messageBuilder.addSection(`name=${wodRoll.user}`);
 
+  // Add a custom roll header, if present
   if (wodRoll.rollname) messageBuilder.addSection(`Rollname=${wodRoll.rollname}`);
 
-  if (wodGlobal.diceLogChat === true) {
-    if (wodGlobal.diceLogRolledOnOneLine === true) {
-      if (wodGlobal.diceGraphicsChat === true) {
-        messageBuilder.addSection(`Roll=${wodRoll.totals.graphics}`);
-      } else {
-        messageBuilder.addSection(`Roll=${wodRoll.totals.text}`);
-      }
-    } else if (wodGlobal.diceGraphicsChat === true) {
-      messageBuilder.addSection(`Normal=${wodRoll.black.graphics}`);
-      messageBuilder.addSection(`Hunger=${wodRoll.red.graphics}`);
-    } else {
-      messageBuilder.addSection(`Normal=${wodRoll.black.text}`);
-      messageBuilder.addSection(`Hunger=${wodRoll.red.text}`);
-    }
-  }
+  // Logic to determine how the dice get visualized
+  // TODO: remove the logic check
+  let sections = visualizeDice(wodRoll);
+  for (let section of sections) messageBuilder.addSection(section);
 
+  // Add the total number of successes
   messageBuilder.addSection(`Successes=${wodRoll.score}`);
 
-  if (wodRoll.flags.rouse) {
-    if (wodRoll.score) {
-      messageBuilder.addBanner('HUNGER_GAIN');
-    } else {
-      messageBuilder.addBanner('HUNGER_NO_GAIN');
-    }
-  } else if (wodRoll.flags.frenzy) {
-    if (wodRoll.score > wodRoll.difficulty) {
-      messageBuilder.addBanner('FRENZY_RESIST');
-    } else {
-      messageBuilder.addBanner('FRENZY');
-    }
-  } else if (wodRoll.flags.remorse) {
-    if (wodRoll.score) {
-      messageBuilder.addBanner('REMORSE_PASS');
-    } else {
-      messageBuilder.addBanner('REMORSE_FAIL');
-    }
-  }
-
-  if (wodRoll.flags.lucky) {
-    messageBuilder.addBanner('LAST_RESORT');
-  }
-
-  if (!wodRoll.totals.successes) {
-    messageBuilder.addBanner('MISS_FAIL');
-  }
-
-  if (wodRoll.flags.messy) {
-    messageBuilder.addBanner('MESSY');
-  } else if (wodRoll.flags.crit) {
-    messageBuilder.addBanner('CRIT');
-  }
-
-  if (wodRoll.red.botches) {
-    messageBuilder.addBanner('BEAST');
-  }
-
-  log("Output");
-  log(messageBuilder.getMessage());
+  // Logic checks to determine which banners to add, if any
+  let banners = determineBanners(wodRoll);
+  for (let banner of banners) messageBuilder.addBanner(banner);
 
   return messageBuilder.getMessage();
 }
@@ -395,8 +374,54 @@ function createMessageBuilder() {
     addBanner,
   };
 }
+function visualizeDice(wodRoll) {
+  let key = wodGlobal.diceGraphicsChat ? 'graphics' : 'text';
+
+  if (wodGlobal.diceLogRolledOnOneLine) return [`Roll=${wodRoll.totals[key]}`];
+
+  return [
+    `Normal=${wodRoll.black[key]}`,
+    `Hunger=${wodRoll.red[key]}`,
+  ];
+}
+function determineBanners(wodRoll) {
+  let banners = [];
+
+  if (wodRoll.flags.rouse) banners.push(wodRoll.score ? 'HUNGER_GAIN' : 'HUNGER_NO_GAIN');
+
+  if (wodRoll.flags.frenzy) {
+    let success = wodRoll.score > wodRoll.difficulty;
+    banners.push(success ? 'FRENZY_RESIST' : 'FRENZY');
+  }
+
+  if (wodRoll.flags.remorse) banners.push(wodRoll.score ? 'REMORSE_PASS' : 'REMORSE_FAIL');
+
+  if (wodRoll.flags.lucky) banners.push('LAST_RESORT');
+  if (!wodRoll.totals.successes) banners.push('MISS_FAIL');
+
+  if (wodRoll.flags.messy) {
+    banners.push('MESSY');
+  } else if (wodRoll.flags.crit) {
+    banners.push('CRIT');
+  }
+
+  if (wodRoll.red.botches) banners.push('BEAST');
+
+  return banners;
+}
 
 
+/**
+ * The various types of rolls.
+ *
+ * @TODO simplify these and make their intentions clearer.
+ * @TODO combine Skill, Willpower, Humanity rolls into just one
+ * @TODO simplify the factory logic for Rouse, Frenzy, Simple, and Remorse rolls
+ *
+ * @param input: the parsed dice totals and configurations (custom names etc)
+ *
+ * @returns: a WodRoll object
+ */
 function handleSkillRoll(input) {
   return new WodRoll(input, true);
 }
@@ -464,16 +489,10 @@ function scaleMultiboxValue(value, scaleNumber) {
  */
 function setLogging(value) {
   const setChatLogging = (key) => {
-    wodGlobal.diceLogChat = {
-      on: true,
-      off: false
-    }[key];
+    wodGlobal.diceLogChat = {on: true, off: false}[key];
   };
   const setSingleLineRollLogging = (key) => {
-    wodGlobal.diceLogRolledOnOneLine = {
-      single: true,
-      multi: false
-    }[key];
+    wodGlobal.diceLogRolledOnOneLine = {single: true, multi: false}[key];
   };
 
   return {
@@ -533,16 +552,15 @@ function WodRoll (args, allowLucky = false) {
   this.flags = {};
 
   let total = sumTotal(this, args, allowLucky);
-
   let redCount = args.hunger || 0;
 
   this.black = new DicePool('NORMAL', Math.max(0, total - redCount));
   this.red = new DicePool('MESSY', redCount);
 
   let pools = [this.black, this.red];
-  this.totals = summarizeDice(this, pools);
+  this.totals = summarizeDice(pools);
 
-  this.score = this.totals.successes + Math.floor(this.totals.crits / 2) * 2;
+  this.score = this.totals.successes + (Math.floor(this.totals.crits / 2) * 2);
   this.flags.crit = (this.totals.crits >= 2);
   this.flags.messy = this.flags.crit && (this.totals.crits > pools[0].crits);
 }
@@ -560,7 +578,7 @@ function sumTotal(wr, args, allowLucky) {
 
   return total;
 }
-function summarizeDice(wr, pools) {
+function summarizeDice(pools) {
   let diceTotals = {};
 
   for (let pool of pools) {
@@ -598,7 +616,7 @@ function DicePool (type, count) {
  * @returns {object} with value and image attributes
  */
 function Die (type) {
-  function getImage(v) {
+  function getImage() {
     return `<img \
     src="${wodCONSTANTS.IMG.DICE[type][value]}" \
     title="${value}" \
@@ -612,7 +630,11 @@ function Die (type) {
   this.image = getImage(value);
 }
 
-// Allows this script to run in local node instances
+/**
+ * Registers the API handler if in the roll20 API environment.
+ *
+ * Otherwise, exports module components.
+ */
 if (typeof on === 'function') {
   on("chat:message", roll20ApiHandler);
 } else {
@@ -628,7 +650,7 @@ if (typeof on === 'function') {
       handleRemorseRoll,
       handleHumanityRoll,
     },
-    calculateRunScript,
+    createWodRoll,
     createMessageBuilder,
     setGraphics,
     setLogging,
